@@ -8,18 +8,52 @@ const NFT = contract.fromArtifact('NFT');
 const NftFarm = contract.fromArtifact('NftFarm');
 const MasterChefV2 = contract.fromArtifact('MasterChefV2');
 let _deployer, _user;
+const ipfsHash1 = 'QmWB5xPBcFRn8qR4uu1VHt1k9vUrxvbezYv3jDC7WD29ie';
+const ipfsHash2 = 'QmX9UuF41nfhnESX3DnVHhC4XwuYAcLEReGyN4CtE8P7Bg';
+const baseURI = 'ipfs://';
+const totalSupplyDistributed = '36';
+const lifePerBurn = web3.utils.toWei('10');
+const endBlockNumber = 0;
+const min_interval = 0;
+const max_interval = 5;
+const allowMultipleClaims = true;
+const rarity = "Common";
+const maxMintPerNft = '66';
+const priceMultiplier = '0';
 
 describe('MasterChefV2', function () {
     beforeEach(async function () {
+        this.timeout(10000);
         _deployer = accounts[0];
         _user = accounts[1];
-
-        this.token = await Token.new({from: _deployer});
-        this.LP = await MockBEP20.new("LP TOken","LP", {from: _deployer});
-
         const deposit = web3.utils.toWei('100');
-        this.token.mint(_user, deposit, {from: _deployer});
-        this.LP.mint(_user, deposit, {from: _deployer});
+        try{
+            this.nft = await NFT.new(baseURI, {from: _deployer});
+        }catch(e){
+            console.error(e);
+        }
+
+        this.alife = await Token.new({from: _deployer});
+        this.LP = await MockBEP20.new("LP Token","LP", deposit, {from: _user});      
+        this.alife.mint(_user, deposit, {from: _deployer});
+        // 
+
+        this.NftFarm1 = await NftFarm.new(
+            this.nft.address, this.alife.address,
+            totalSupplyDistributed, lifePerBurn,
+            baseURI, ipfsHash1, endBlockNumber,
+            allowMultipleClaims, rarity, maxMintPerNft, priceMultiplier,
+            min_interval, max_interval, {from: _deployer});
+
+        this.NftFarm2 = await NftFarm.new(
+            this.nft.address, this.alife.address,
+            totalSupplyDistributed, lifePerBurn,
+            baseURI, ipfsHash2, endBlockNumber,
+            allowMultipleClaims, rarity, maxMintPerNft, priceMultiplier,
+            min_interval, max_interval, {from: _deployer});
+
+        await this.nft.manageMinters(this.NftFarm1.address, true, {from: _deployer});
+        await this.nft.manageMinters(this.NftFarm2.address, true, {from: _deployer});
 
         const _devaddr = accounts[0];
         const _feeAddress = accounts[2];
@@ -27,21 +61,21 @@ describe('MasterChefV2', function () {
 
         const _startBlock = 1;
         this.pool = await MasterChefV2.new(
-            this.token.address, _devaddr, _feeAddress, _tokenPerBlock, _startBlock,
+            this.alife.address, _devaddr, _feeAddress, _tokenPerBlock, _startBlock,
             {from: _deployer});
-        await this.token.transferOwnership(this.pool.address, {from: _deployer});
+        await this.alife.transferOwnership(this.pool.address, {from: _deployer});
     });
 
     describe('TEST POOL', function () {
         const deposit = web3.utils.toWei('100');
         it('farm without nft', async function () {
             // add(uint256 _allocPoint, IBEP20 _lpToken, uint16 _depositFeeBP, bool _withUpdate, uint8 _mustHaveNft)
-            const pid = 0;
-            const allocPoint = '0';
+            const pid = '0';
+            const allocPoint = '1';
             const lpToken = this.LP.address;
             const depositFeeBP = '0';
             const withUpdate = true;
-            const mustHaveNft = 0;
+            const mustHaveNft = '0';
             await this.pool.add(allocPoint, lpToken, depositFeeBP, withUpdate, mustHaveNft, {from: _deployer});
             await this.LP.approve(this.pool.address, deposit, {from: _user});
             await this.pool.deposit(pid, deposit, {from: _user});
@@ -50,14 +84,11 @@ describe('MasterChefV2', function () {
             // any amount
             expect(depositedAmount).to.be.equal(deposit.toString());
 
-            const balanceOf = await this.token.balanceOf(_user, {from: _user});
-            const expected_balance = new BN(web3.utils.toWei('0')).toString();
-            expect(balanceOf.toString()).to.be.equal( expected_balance );
-
             time.advanceBlock();
 
             const pendingReward = await this.pool.pendingReward( pid, _user, {from: _user} );
             const reward = pendingReward.toString();
+            expect(pendingReward).to.be.bignumber.equal( web3.utils.toWei('1') );
             console.log('reward', reward);
 
         });

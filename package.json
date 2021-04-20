@@ -9,7 +9,7 @@
     "testnet": "truffle migrate --network testnet --reset && truffle run verify AfterLife MasterChefV2 --network testnet",
     "testnet-vlad": "truffle migrate --f 3 --to 3 --network testnet --reset && truffle run verify VladToken --network testnet",
     "mainnet": "truffle migrate --network mainnet --reset && truffle run verify AfterLife MasterChefV2 --network mainnet",
-    "test": "truffle test test/farm_with_nft.test --network dev --bail",
+    "test": "truffle test test/farm_with_nft.test.js --network dev --bail",
     "test-nft": "truffle test test/NftMinting.test.js --show-events --network dev --bail",
     "live": "truffle migrate --network dev --f 2 --to 2 && nodemon --exec yarn test -e sol,js",
     "live-nft": "truffle migrate --network dev --f 4 --to 4 && nodemon --exec yarn test-nft -e sol,js"

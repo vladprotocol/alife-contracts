@@ -319,6 +319,8 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
 
     // TODO: test case
     function hasNft(NftFarm farm, address sender, uint8 id) internal view returns (bool){
+        // becase of overlap issue with nftId from nft minting farm contracts, we need to apply
+        // a very complex filter to detect if user has the correct nft to farm.
         uint8[3] memory cat = categories[id]; // (0,1,2) | (3,4,5)
         for( uint i = 0 ; i < 2 ; ++i ){
             uint8 nftId = cat[i]; // 0, 2, 3

@@ -44,7 +44,7 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
         uint256 lastRewardBlock;    // Last block number that ALIFEs distribution occurs.
         uint256 accLifePerShare;    // Accumulated ALIFEs per share, times 1e12. See below.
         uint16 depositFeeBP;       // Deposit fee in basis points
-        uint8 mustHaveNft;          // If passed, user must have this nft cat to farm
+        uint256 mustHaveNft;          // If passed, user must have this nft cat to farm
     }
 
     // The ALIFE TOKEN!
@@ -71,12 +71,12 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
     uint256 public startBlock;
 
 
-    uint8 private constant BASIC = 1;
-    uint8 private constant RARE = 2;
-    uint8 private constant EPIC = 3;
-    uint8 private constant LEGENDARY = 4;
-    mapping( uint8 => string ) private cat_hash;
-    mapping( uint8 => uint8[3] ) private categories;
+    uint256 private constant BASIC = 1;
+    uint256 private constant RARE = 2;
+    uint256 private constant EPIC = 3;
+    uint256 private constant LEGENDARY = 4;
+    mapping( uint256 => string ) private cat_hash;
+    mapping( uint256 => uint8[3] ) private categories;
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
@@ -97,35 +97,6 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
         feeAddress = _feeAddress;
         tokenPerBlock = _tokenPerBlock;
         startBlock = _startBlock;
-        nft_init();
-    }
-    function nft_init() internal {
-
-        nft = NFT(0x3F7C7C24fFA2ceFfaACE11B39D5b8a575A4B0674);
-        nftMinter1 = NftFarm(0x08d2cBc5EFd1B56034F4628bB32e947C0d86BbB1);
-        nftMinter2 = NftFarm(0x6a63AF63675D3c9D498DF43Aa163F9243E7b4646);
-        // related to nft minting farm overlap
-
-        categories[BASIC][0] = 0;
-        categories[BASIC][1] = 1;
-        categories[BASIC][2] = 2;
-        // basic
-        categories[RARE][0] = 3;
-        categories[RARE][1] = 4;
-        categories[RARE][2] = 5;
-        // rare
-        categories[EPIC][0] = 0;
-        categories[EPIC][1] = 1;
-        categories[EPIC][2] = 2;
-        // epic
-        categories[LEGENDARY][0] = 3;
-        categories[LEGENDARY][1] = 4;
-        categories[LEGENDARY][2] = 5;
-        // legendary
-        cat_hash[BASIC] = "QmWB5xPBcFRn8qR4uu1VHt1k9vUrxvbezYv3jDC7WD29ie";
-        cat_hash[RARE] = "QmWB5xPBcFRn8qR4uu1VHt1k9vUrxvbezYv3jDC7WD29ie";
-        cat_hash[EPIC] = "QmX9UuF41nfhnESX3DnVHhC4XwuYAcLEReGyN4CtE8P7Bg";
-        cat_hash[LEGENDARY] = "QmX9UuF41nfhnESX3DnVHhC4XwuYAcLEReGyN4CtE8P7Bg";
     }
 
     function poolLength() external view returns (uint256) {
@@ -139,7 +110,7 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
     }
 
     // Add a new lp to the pool. Can only be called by the owner.
-    function add(uint256 _allocPoint, IBEP20 _lpToken, uint16 _depositFeeBP, bool _withUpdate, uint8 _mustHaveNft) public onlyOwner nonDuplicated(_lpToken) {
+    function add(uint256 _allocPoint, IBEP20 _lpToken, uint16 _depositFeeBP, bool _withUpdate, uint256 _mustHaveNft) public onlyOwner nonDuplicated(_lpToken) {
         require(_depositFeeBP <= 10000, "add: invalid deposit fee basis points");
         if (_withUpdate) {
             massUpdatePools();
@@ -303,33 +274,74 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
     }
 
     // TODO: test case
-    function set_rarity(uint256 _pid, uint8 _mustHaveNft) public onlyOwner {
+    function set_rarity(uint256 _pid, uint256 _mustHaveNft) public onlyOwner {
         poolInfo[_pid].mustHaveNft = _mustHaveNft;
     }
 
-    // TODO: test case
-    function mustHaveNft(address sender, uint8 id) public view returns (bool) {
-        if (id == 0) {
-            return true;
-        }
-        bool nftFound1 = hasNft(nftMinter1, sender, id);
-        bool nftFound2 = hasNft(nftMinter2, sender, id);
-        return nftFound1 || nftFound2;
+function nft_init( address _nft, address _nftMinter1, address _nftMinter2) public onlyOwner {
+
+        nft = NFT(_nft);
+        nftMinter1 = NftFarm(_nftMinter1);
+        nftMinter2 = NftFarm(_nftMinter2);
+        // related to nft minting farm overlap
+
+        categories[BASIC][0] = 0;
+        categories[BASIC][1] = 1;
+        categories[BASIC][2] = 2;
+        // basic
+        categories[RARE][0] = 3;
+        categories[RARE][1] = 4;
+        categories[RARE][2] = 5;
+        // rare
+        categories[EPIC][0] = 0;
+        categories[EPIC][1] = 1;
+        categories[EPIC][2] = 2;
+        // epic
+        categories[LEGENDARY][0] = 3;
+        categories[LEGENDARY][1] = 4;
+        categories[LEGENDARY][2] = 5;
+        // legendary
+        cat_hash[BASIC] = "QmWB5xPBcFRn8qR4uu1VHt1k9vUrxvbezYv3jDC7WD29ie";
+        cat_hash[RARE] = "QmWB5xPBcFRn8qR4uu1VHt1k9vUrxvbezYv3jDC7WD29ie";
+        cat_hash[EPIC] = "QmX9UuF41nfhnESX3DnVHhC4XwuYAcLEReGyN4CtE8P7Bg";
+        cat_hash[LEGENDARY] = "QmX9UuF41nfhnESX3DnVHhC4XwuYAcLEReGyN4CtE8P7Bg";
     }
 
     // TODO: test case
-    function hasNft(NftFarm farm, address sender, uint8 id) internal view returns (bool){
-        // becase of overlap issue with nftId from nft minting farm contracts, we need to apply
-        // a very complex filter to detect if user has the correct nft to farm.
-        uint8[3] memory cat = categories[id]; // (0,1,2) | (3,4,5)
-        for( uint i = 0 ; i < 2 ; ++i ){
-            uint8 nftId = cat[i]; // 0, 2, 3
-            if( farm.getMintsOf(sender, nftId) == 0 )
+    function mustHaveNft(address sender, uint256 id) public view returns (bool) {
+        if (id == 0) {
+            return true;
+        }
+        string memory HASH = cat_hash[id];
+
+        uint256 length = categories[id].length;
+        for( uint256 i = 0 ; i < length ; ++i ){
+            uint8 nftId = categories[id][i];
+            if( nftMinter1.getMintsOf(sender, nftId) == 0 ) 
                 continue;
-            string memory uri = nft.tokenURI( nftId );
-            if( uri.indexOf(cat_hash[id]) != -1 )
+// string memory s = string(abi.encodePacked(" id=", itod(id), " t=", itod(t), " HASH=",HASH, " uri=",uri, " idx=",itod(idx)) );
+// require(false,s);
+            if( nftMinter1.nftIdURIs(nftId).indexOf(cat_hash[id]) != -1 )
+                return true;
+
+            if( nftMinter2.getMintsOf(sender, nftId) == 0 ) 
+                continue;
+            if( nftMinter2.nftIdURIs(nftId).indexOf(cat_hash[id]) != -1 )
                 return true;
         }
         return false;
     }
+
+    function itod(uint256 x) private pure returns (string memory) {
+        if (x > 0) {
+            string memory str;
+            while (x > 0) {
+                str = string(abi.encodePacked(uint8(x % 10 + 48), str));
+                x /= 10;
+            }
+            return str;
+        }
+        return "0";
+    }
+
 }

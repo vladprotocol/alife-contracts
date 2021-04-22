@@ -34,8 +34,10 @@ describe('MasterChefV2', function () {
         }
 
         this.alife = await Token.new({from: _deployer});
-        this.LP = await MockBEP20.new("LP Token","LP", deposit, {from: _user});      
-        this.alife.mint(_user, deposit, {from: _deployer});
+        this.LP = await MockBEP20.new("LP Token","LP", deposit, {from: _user});
+
+        await this.alife.setMinterStatus(_deployer, true, {from: _deployer});
+        await this.alife.mint(_user, deposit, {from: _deployer});
         // 
 
         this.NftFarm1 = await NftFarm.new(
@@ -71,6 +73,15 @@ describe('MasterChefV2', function () {
         await this.alife.transferOwnership(this.pool.address, {from: _deployer});
 
         this.pool.nft_init(this.nft.address, this.NftFarm1.address, this.NftFarm2.address, {from: _deployer});
+
+    });
+
+    describe('TEST SECURITY', function () {
+
+        it('setMinterStatus', async function () {
+            await expectRevert(this.pool.setMinterStatus(_deployer, true, {from: _user}), 'caller is not the owner');
+            await this.pool.setMinterStatus(_deployer, true, {from: _deployer});
+        });
 
     });
 

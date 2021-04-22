@@ -278,7 +278,12 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
         poolInfo[_pid].mustHaveNft = _mustHaveNft;
     }
 
-function nft_init( address _nft, address _nftMinter1, address _nftMinter2) public onlyOwner {
+    // set minters from MasterChef so it can be timelocked
+    function setMinterStatus( address _minter, bool _status) external onlyOwner{
+        alife.setMinterStatus(_minter, _status);
+    }
+
+    function nft_init( address _nft, address _nftMinter1, address _nftMinter2) public onlyOwner {
 
         nft = NFT(_nft);
         nftMinter1 = NftFarm(_nftMinter1);
@@ -319,8 +324,6 @@ function nft_init( address _nft, address _nftMinter1, address _nftMinter2) publi
             uint8 nftId = categories[id][i];
             if( nftMinter1.getMintsOf(sender, nftId) == 0 ) 
                 continue;
-// string memory s = string(abi.encodePacked(" id=", itod(id), " t=", itod(t), " HASH=",HASH, " uri=",uri, " idx=",itod(idx)) );
-// require(false,s);
             if( nftMinter1.nftIdURIs(nftId).indexOf(cat_hash[id]) != -1 )
                 return true;
 
@@ -332,16 +335,5 @@ function nft_init( address _nft, address _nftMinter1, address _nftMinter2) publi
         return false;
     }
 
-    function itod(uint256 x) private pure returns (string memory) {
-        if (x > 0) {
-            string memory str;
-            while (x > 0) {
-                str = string(abi.encodePacked(uint8(x % 10 + 48), str));
-                x /= 10;
-            }
-            return str;
-        }
-        return "0";
-    }
 
 }

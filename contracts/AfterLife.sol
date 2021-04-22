@@ -13,11 +13,37 @@ import "./libs/BEP20.sol";
 
 // AfterLife with Governance.
 contract AfterLife is BEP20('AfterLife', 'ALIFE') {
-    /// @notice Creates `_amount` token to `_to`. Must only be called by the owner (MasterChef).
-    function mint(address _to, uint256 _amount) public onlyOwner {
+    mapping(address => bool) public minters;
+    event minterStatus(address minter, bool status);
+    constructor() public {
+        _mint(msg.sender, 1 ether); // minting 1 token to test pools.
+    }
+    // Creates `_amount` token to `_to`. Must only be called by the owner (MasterChef).
+    function mint(address _to, uint256 _amount) public onlyMinters {
         _mint(_to, _amount);
         _moveDelegates(address(0), _delegates[_to], _amount);
     }
+
+    // We are adding support for multiple minters, so we can extend
+    // support for other contracts to mint, ex: the marketplace.
+    modifier onlyMinters() {
+        require(minters[ msg.sender ], "caller is not a minter");
+        _;
+    }
+    // New minters can only be added vi MasterChef that is timelocked.
+    function setMinterStatus( address _minter, bool _status) external onlyOwner {
+        require( _minter != address(0x0) , "0x0 minter");
+        minters[ _minter ] = _status;
+        emit minterStatus(_minter, _status);
+    }
+
+
+
+
+
+
+
+
 
     // Copied and modified from YAM code:
     // https://github.com/yam-finance/yam-protocol/blob/master/contracts/token/YAMGovernanceStorage.sol

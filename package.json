@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "truffle migrate --network dev --reset",
     "dev-nft": "truffle migrate --network dev --f 4 --to 4",
-    "testnet-nft": "truffle migrate --network testnet --f 4 --to 4 && truffle run verify NftFarm --network testnet",
-    "testnet": "truffle migrate --network testnet --reset && truffle run verify AfterLife MasterChefV2 --network testnet",
+    "testnet-nft": "truffle migrate --network testnet --f 3 --to 3 && truffle run verify NftFarm --network testnet",
+    "testnet": "truffle migrate --network testnet --f 2 --to 2 && truffle run verify AfterLife MasterChefV2 --network testnet",
     "testnet-vlad": "truffle migrate --f 3 --to 3 --network testnet --reset && truffle run verify VladToken --network testnet",
     "mainnet": "truffle migrate --network mainnet --reset && truffle run verify AfterLife MasterChefV2 --network mainnet",
     "test": "truffle test test/farm_with_nft.test.js --network dev --bail",

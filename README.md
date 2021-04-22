@@ -20,18 +20,18 @@ LP token to farm Life:
 - Buy Vlad: https://exchange.pancakeswap.finance/#/swap?outputCurrency=0x279d41f3f78fe5c1f0ba41ae963d6e545113c973 
   
 
-- AfterLife - https://bscscan.com/token/0x0
-- MasterChef - https://bscscan.com/address/0x0
-- Timelock - https://bscscan.com/address/0x0
-- MultiCall - https://bscscan.com/address/0x0
-
-
 ### BSCTESTNET
 
-- AfterLife - https://testnet.bscscan.com/address/0xADA2270B0CB5b6254d3d48A6fEE55b72693B746A#code
-- MasterChef - https://testnet.bscscan.com/address/0xE37Aa693d2Ab77721E11e55bfBC723cf4457b78E#code
-- VladToken - https://testnet.bscscan.com/address/0x5Ef22E12B661de51c4f103ed607AA30FFEf7ed09#code
-  (for test only)
+- LifeToken - 0xADA2270B0CB5b6254d3d48A6fEE55b72693B746A
+- MasterChef - 0xE37Aa693d2Ab77721E11e55bfBC723cf4457b78E
+- VladToken - 0xa800D23CCc013d2cFF18665cCc4709d45D969841
+- NftFarm 0x61d55B8E38C8D0eE6C52105C0cc59498De0C478d
+- ipfs QmX9UuF41nfhnESX3DnVHhC4XwuYAcLEReGyN4CtE8P7Bg 
+- NFT 0xA81Ab2D03b9E3a62BDBb837d417A5E221F754E14
+
+- AfterLife 0x943ABB19055FBA3d3f7bc3e46F6510720DdA548c
+- MasterChefV2 0x19823254C1E577cc466EAd010A03e4496A2C77d4
+
 
 # NftFarm.sol
 

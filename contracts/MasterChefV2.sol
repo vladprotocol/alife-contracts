@@ -103,21 +103,15 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
         return poolInfo.length;
     }
 
-    mapping(IBEP20 => bool) public poolExistence;
-    modifier nonDuplicated(IBEP20 _lpToken) {
-        require(poolExistence[_lpToken] == false, "nonDuplicated: duplicated");
-        _;
-    }
-
     // Add a new lp to the pool. Can only be called by the owner.
-    function add(uint256 _allocPoint, IBEP20 _lpToken, uint16 _depositFeeBP, bool _withUpdate, uint256 _mustHaveNft) public onlyOwner nonDuplicated(_lpToken) {
+    function add(uint256 _allocPoint, IBEP20 _lpToken, uint16 _depositFeeBP, bool _withUpdate, uint256 _mustHaveNft) public onlyOwner {
         require(_depositFeeBP <= 10000, "add: invalid deposit fee basis points");
         if (_withUpdate) {
             massUpdatePools();
         }
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
-        poolExistence[_lpToken] = true;
+
         poolInfo.push(PoolInfo({
         lpToken : _lpToken,
         allocPoint : _allocPoint,
@@ -314,6 +308,14 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
 
     // TODO: test case
     function mustHaveNft(address sender, uint256 id) public view returns (bool) {
+        bool status = _mustHaveNft(sender, id);
+        if( status == false && id == EPIC )
+            status = _mustHaveNft(sender, LEGENDARY);
+        if( status == false && id == LEGENDARY )
+            status = _mustHaveNft(sender, EPIC);
+        return status;
+    }
+    function _mustHaveNft(address sender, uint256 id) internal view returns (bool) {
         if (id == 0) {
             return true;
         }
@@ -322,12 +324,12 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
         uint256 length = categories[id].length;
         for( uint256 i = 0 ; i < length ; ++i ){
             uint8 nftId = categories[id][i];
-            if( nftMinter1.getMintsOf(sender, nftId) == 0 ) 
+            if( nftMinter1.getMintsOf(sender, nftId) == 0 )
                 continue;
             if( nftMinter1.nftIdURIs(nftId).indexOf(cat_hash[id]) != -1 )
                 return true;
 
-            if( nftMinter2.getMintsOf(sender, nftId) == 0 ) 
+            if( nftMinter2.getMintsOf(sender, nftId) == 0 )
                 continue;
             if( nftMinter2.nftIdURIs(nftId).indexOf(cat_hash[id]) != -1 )
                 return true;

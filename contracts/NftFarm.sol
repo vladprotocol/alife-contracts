@@ -22,7 +22,11 @@ contract NftFarm is Ownable {
     uint8[] public minted;
     mapping(uint8 => uint256) public hasClaimed;
     mapping(uint8 => address[] ) public ownersOf;
+    mapping(uint256 => address[] ) public burns;
+    mapping(uint8 => uint256 ) public burnsTotalByNftId;
+    mapping(uint256 => address ) public ownerOfTokenId;
     mapping(uint8 => address ) public lastOwners;
+    mapping(uint256 => uint256) public priceByNftId; // test pending
 
     uint256 public startBlockNumber;
     uint256 public endBlockNumber;
@@ -34,6 +38,7 @@ contract NftFarm is Ownable {
     string public ipfsHash;
     string public rarity;
     mapping(uint8 => string) public nftIdURIs; // test ok
+
     uint8 public numberOfNftIds;
 
     // on marketplace bootstrap and not changeable anymore.
@@ -152,7 +157,7 @@ contract NftFarm is Ownable {
 
         require( _nftId >= min_index && _nftId <= max_index, "Out of minting interval");
 
-        require(allowMultipleClaims == true || hasClaimed[_nftId] == 0, "Has claimed");
+        require(allowMultipleClaims == true || hasClaimed[_nftId] == 0, "claimed");
 
         require(startBlockNumber == 0 || block.number > startBlockNumber, "Too early");
         require(endBlockNumber == 0 || block.number < endBlockNumber, "Too late");
@@ -185,9 +190,33 @@ contract NftFarm is Ownable {
         nftIdURIs[_nftId] = tokenURI;
         uint256 tokenId = nft.mint(address(msg.sender), tokenURI, _nftId);
 
-        // send ALIFE to DEAD address, effectively burning it.
-        token.safeTransferFrom(address(msg.sender), BURN_ALIFE, price);
+        ownerOfTokenId[tokenId] = msg.sender;
+        priceByNftId[tokenId] = price;
+
+        distributeReward( tokenId, price );
+
         emit NftMint(msg.sender, tokenId, _nftId, hasClaimed[_nftId], price );
+    }
+
+    function distributeReward( uint256 tokenId, uint256 price ) internal {
+        token.safeTransferFrom(address(msg.sender), BURN_ALIFE, price);
+    }
+    function burnNFT(uint8 tokenId) external {
+        require( ownerOfTokenId[tokenId] == msg.sender, "not nft owner" );
+        ownerOfTokenId[tokenId] = address(0x0);
+        uint256 price = priceByNftId[tokenId];
+        require( price > 0 , "invalid tokenId");
+        priceByNftId[tokenId] = 0;
+        uint256 _nftId = token.getNftId(tokenId);
+
+        address[] storage _ownersOf = burns[_nftId];
+        burns.push( msg.sender );
+
+        currentDistributedSupply = currentDistributedSupply.sub(1);
+        hasClaimed[_nftId] = hasClaimed[_nftId].sub(1);
+        nft.burn(tokenId);
+        countBurnt = countBurnt.add(1);
+        burnsTotalByNftId[nftId] = burnsTotalByNftId.add(1);
     }
 
     function adminSetInterval(uint256 _start, uint256 _end) external onlyOwner {

@@ -66,6 +66,42 @@ contract NftFarm is Ownable {
     uint8 public min_index;
     uint8 public max_index;
 
+    // fee & payment management
+    uint256 public FEE_ARTIST     = 3000; // 30%
+    uint256 public FEE_GOVERNANCE = 1500; // 15%
+    uint256 public FEE_TREASURE   = 500;  //  5%
+
+    struct NftTradeInfo{
+        uint8 nftId;
+        address owner;
+        uint256 price;
+        uint256 artistFee;
+        uint256 governanceFee;
+        uint256 treasureFee;
+        uint256 reserve;
+        uint256 timestamp;
+    }
+    mapping(uint256 => NftTradeInfo) public nftTrades;
+
+
+    // artist management
+    address artistFundAddr;
+    address governanceFundAddr;
+    address treasureFundAddr;
+    struct NftArtistInfo{
+        uint8 nftId;
+        address owner;
+        uint256 price;
+        uint256 artistFee;
+        uint256 governanceFee;
+        uint256 treasureFee;
+        uint256 treasureFee;
+        uint256 reserve;
+        uint256 timestamp;
+    }
+    mapping(uint8 => NftArtistInfo) public nftArtist;
+
+    // events
     event NftMint(address indexed to, uint256 indexed tokenId, uint8 indexed nftId, uint256 amount, uint256 price);
     event NftBurn(address indexed from, uint256 indexed tokenId);
 
@@ -104,6 +140,11 @@ contract NftFarm is Ownable {
         require(tokenPerBurn > 0, "price must be greater than 0");
         require(totalSupplyDistributed >0, "must be greater than 0");
         require(min_index < max_index && max_index > 0, "invalid min max");
+
+        // all fee wallets defaults to deployer, must be changed later.
+        artistFundAddr = msg.sender;
+        governanceFundAddr = msg.sender;
+        treasureFundAddr = msg.sender;
 
     }
 
@@ -193,14 +234,45 @@ contract NftFarm is Ownable {
         ownerOfTokenId[tokenId] = msg.sender;
         priceByNftId[tokenId] = price;
 
-        distributeReward( tokenId, price );
+        distributeReward( _nftId, tokenId, price );
 
         emit NftMint(msg.sender, tokenId, _nftId, hasClaimed[_nftId], price );
     }
 
-    function distributeReward( uint256 tokenId, uint256 price ) internal {
-        token.safeTransferFrom(address(msg.sender), BURN_ALIFE, price);
+    function distributeReward( uint8 nftId, uint256 tokenId, uint256 price ) internal {
+        /*
+        - 50 alife is locked and stored in the contract
+        - 30 alife is sent to artist
+        - 15 alife is sent to governance (= xVLAD)
+        - 5 alife is sent to treasury (= dev fund)
+        */
+
+        NftTradeInfo storage trade = nftTrades[tokenId];
+        trade.nftId = nftId;
+        trade.tokenId = tokenId;
+        trade.price = price;
+        trade.artistFee = price.mul(FEE_ARTIST).div(10000);
+        trade.governanceFee = price.mul(FEE_GOVERNANCE).div(10000);
+        trade.treasureFee = price.mul(FEE_TREASURE).div(10000);
+        trade.reserve = price.sub(artistFee).sub(governanceFee).sub(treasureFee);
+        trade.timestamp = block.timestamp;
+
+        token.safeTransferFrom(address(msg.sender), getArtistFor(nftId), trade.artistFee);
+        token.safeTransferFrom(address(msg.sender), governanceFundAddr, trade.governanceFee);
+        token.safeTransferFrom(address(msg.sender), treasureFundAddr, trade.treasureFee);
+        token.safeTransferFrom(address(msg.sender), address(this), trade.reserve);
+
     }
+
+    function getArtistFor( uint8 nftId ) public view returns (address){
+        address addr = nftArtist[nftId];
+        if( addr == address(0x0) ){
+            // nor artist to this nft, return default fund.
+            addr = artistFundAddr;
+        }
+        return addr;
+    }
+
     function burnNFT(uint8 tokenId) external {
         require( ownerOfTokenId[tokenId] == msg.sender, "not nft owner" );
         ownerOfTokenId[tokenId] = address(0x0);
@@ -328,6 +400,20 @@ contract NftFarm is Ownable {
         require(_min_index < _max_index, "wrong min");
         min_index = _min_index;
         max_index = _max_index;
+    }
+
+    // default addr if nor artis addr set
+    function adminSetArtistFundAddr(address _newAddr) external onlyOwner {
+        artistFundAddr = _newAddr;
+    }
+
+    // change governance address
+    function adminSetGovernanceFundAddr(address _newAddr) external onlyOwner {
+        governanceFundAddr = _newAddr;
+    }
+    // change treasure/dev address
+    function adminSetTreasureFundAddr(address _newAddr) external onlyOwner {
+        treasureFundAddr = _newAddr;
     }
 
     modifier mintingManagers(){

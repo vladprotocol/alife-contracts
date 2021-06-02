@@ -14,15 +14,20 @@ pragma solidity ^0.6.12;
 contract NftFarm is Ownable, ReentrancyGuard {
     using SafeMath for uint8;
     using SafeMath for uint256;
-
     using SafeBEP20 for IBEP20;
 
     NFT public nft;
     IBEP20 public token;
 
-    uint8[] public minted;
-    mapping(uint8 => address[]) public ownersOf;
-    mapping(uint8 => address) public lastOwners;
+    // global stats
+    uint256 totalMint; // total of all mints
+    uint256 totalBurn; // total of all burns
+    uint256 totalTokensCollected; //amount of tokens received
+    uint256 totalTokensRefunded; //amount of tokens refunded to users on burn
+    uint256 totalPaidToAuthors; //amount of tokens sent to nft authors
+
+    uint8[] public minted; // array of nft minted, unique, added on first mint only.
+    mapping(uint8 => address[]) public ownersOf; // wallets by nftId
 
     // can manage price and limits
     mapping(address => bool) public mintingManager;
@@ -31,9 +36,9 @@ contract NftFarm is Ownable, ReentrancyGuard {
     address BURN_ALIFE = address(0x000000000000000000000000000000000000dEaD);
 
     // fee & payment management
-    uint256 public FEE_ARTIST = 3000; // 30%
-    uint256 public FEE_GOVERNANCE = 1500; // 15%
-    uint256 public FEE_TREASURE = 500;  //  5%
+    uint256 public authorFee = 3000; // 30%
+    uint256 public govFee = 1500; // 15%
+    uint256 public devFee = 500;  //  5%
 
     struct NftTradeInfo {
         uint8 nftId;
@@ -42,7 +47,7 @@ contract NftFarm is Ownable, ReentrancyGuard {
         uint256 price;
         uint256 artistFee;
         uint256 governanceFee;
-        uint256 treasureFee;
+        uint256 devFee;
         uint256 reserve;
         uint256 mintedIn;
         uint256 burnedIn;
@@ -76,22 +81,28 @@ contract NftFarm is Ownable, ReentrancyGuard {
         uint256 multiplier; // factor, to enable price curve
 
         uint256 minted; // amount minted
-        uint256 burned; // amount burned
         uint256 lastMint; // timestamp of last minted
+        uint256 burned; // amount burned
+        uint256 lastBurn; // timestamp of last burn
         address lastOwner;
     }
 
-    mapping(uint8 => NftInfo) public nftInfo;
-    mapping(uint8 => NftInfoState) public nftInfoState;
+    // array of all nft added
     uint256[] public nftIndex;
+    // basic nft info to display
+    mapping(uint8 => NftInfo) public nftInfo;
+    // state info, like minting, minted, burned
+    mapping(uint8 => NftInfoState) public nftInfoState;
+    // list of all nft minting by nft id
+    mapping(uint8 => uint256[]) public listOfTradesByTokenId;
 
     // events
-     event NftAdded(uint8 indexed nftId, address indexed author, uint256 startBlock, uint256 endBlock);
-     event NftChanged(uint8 indexed nftId, address indexed author, uint256 startBlock, uint256 endBlock);
-     event NftStateAdded(uint8 indexed nftId, uint256 price, uint256 multiplier);
+    event NftAdded(uint8 indexed nftId, address indexed author, uint256 startBlock, uint256 endBlock);
+    event NftChanged(uint8 indexed nftId, address indexed author, uint256 startBlock, uint256 endBlock);
+    event NftStateAdded(uint8 indexed nftId, uint256 price, uint256 multiplier);
 
-     event NftMint(address indexed to, uint256 indexed tokenId, uint8 indexed nftId, uint256 amount, uint256 price);
-     event NftBurn(address indexed from, uint256 indexed tokenId);
+    event NftMint(address indexed to, uint256 indexed tokenId, uint8 indexed nftId, uint256 amount, uint256 price);
+    event NftBurn(address indexed from, uint256 indexed tokenId);
 
     constructor(NFT _nft, IBEP20 _token) public {
         nft = _nft;
@@ -169,79 +180,89 @@ contract NftFarm is Ownable, ReentrancyGuard {
         return price;
     }
 
-    /*
-        function mint(uint8 _nftId) external nonReentrant{
 
-            NftInfo storage NFT = nftInfo[_nftId];
+    function mint(uint8 _nftId) external nonReentrant {
 
-            require(NFT.nftId > 0, "NFT not available");
-            require(NFT.startBlock == 0 || block.number > NFT.startBlock, "Too early");
-            require(NFT.endBlock == 0 || block.number < NFT.endBlock, "Too late");
+        NftInfo storage NFT = nftInfo[_nftId];
+        NftInfoState storage NftState = nftInfoState[_nftId];
 
-            if( NFT.minted == 0 ){
-                minted.push(_nftId);
-                nft.setNftName(_nftId, NFT.rarity);
-            }
+        require(NftState.nftId > 0, "NFT not available");
+        require(NFT.startBlock == 0 || block.number > NFT.startBlock, "Too early");
+        require(NFT.endBlock == 0 || block.number < NFT.endBlock, "Too late");
 
-            NFT.minted = NFT.minted.add(1);
-            NFT.lastOwner = msg.sender;
-            NFT.lastMint = block.timestamp;
-
-            require( NFT.maxMint==0 || NFT.minted <= NFT.maxMint, "Max minting reached");
-
-            address[] storage _ownersOf = ownersOf[_nftId];
-            _ownersOf.push( msg.sender );
-
-            uint256 tokenId = nft.mint(address(msg.sender), NFT.uri, _nftId);
-            NftTradeInfo storage TRADE = nftTrade[tokenId];
-            TRADE.nftId = _nftId;
-            TRADE.owner = msg.sender;
-            NFT.price = getPrice(_nftId, NFT.minted );
-
-            NftTradeInfo storage trade = nftTrade[tokenId];
-            trade.nftId = _nftId;
-            trade.tokenId = tokenId;
-
-            trade.mintedIn = block.timestamp;
-            trade.price = NFT.price;
-            if( NFT.authorFee == 0 ){
-                trade.artistFee = NFT.price.mul(FEE_ARTIST).div(10000);
-            }else{
-                trade.artistFee = NFT.price.mul(NFT.authorFee).div(10000);
-            }
-            trade.governanceFee = NFT.price.mul(FEE_GOVERNANCE).div(10000);
-            trade.treasureFee = NFT.price.mul(FEE_TREASURE).div(10000);
-            trade.reserve = trade.price.sub(trade.artistFee).sub(trade.governanceFee).sub(trade.treasureFee);
-
-            token.safeTransferFrom(address(msg.sender), NFT.author, trade.artistFee);
-            token.safeTransferFrom(address(msg.sender), governanceFundAddr, trade.governanceFee);
-            token.safeTransferFrom(address(msg.sender), treasureFundAddr, trade.treasureFee);
-            token.safeTransferFrom(address(msg.sender), address(this), trade.reserve);
-
-            emit NftMint(msg.sender, tokenId, _nftId, NFT.minted, NFT.price );
-
+        if (NftState.minted == 0) {
+            minted.push(_nftId);
+            nft.setNftName(_nftId, NFT.rarity);
         }
 
-        function burn(uint256 tokenId) external nonReentrant{
+        NftState.minted = NftState.minted.add(1);
+        NftState.lastOwner = msg.sender;
+        NftState.lastMint = block.timestamp;
+        NftState.price = getPrice(_nftId, NftState.minted);
 
-            NftTradeInfo storage trade = nftTrade[tokenId];
+        require(NftState.maxMint == 0 || NftState.minted <= NftState.maxMint, "Max minting reached");
 
-            require( trade.owner == msg.sender, "not nft owner" );
-            require( trade.reserve > 0 , "invalid reserve amount");
+        address[] storage _ownersOf = ownersOf[_nftId];
+        _ownersOf.push(msg.sender);
 
-            uint8 _nftId = nft.getNftId(tokenId);
+        uint256 tokenId = nft.mint(address(msg.sender), NFT.uri, _nftId);
 
-            nft.burn(tokenId);
-            require( trade.burnedIn != 0, "already burned");
-            trade.burnedIn = block.timestamp;
+        uint256[] storage tradesByTokenId = listOfTradesByTokenId[_nftId];
+        tradesByTokenId.push(tokenId);
 
-            NftInfo storage NFT = nftInfo[_nftId];
-            NFT.burned = NFT.burned.add(1);
+        NftTradeInfo storage TRADE = nftTrade[tokenId];
+        TRADE.nftId = _nftId;
+        TRADE.owner = msg.sender;
+        TRADE.nftId = _nftId;
+        TRADE.tokenId = tokenId;
 
-            token.safeTransfer(address(msg.sender), trade.reserve);
-
+        TRADE.mintedIn = block.timestamp;
+        TRADE.price = NftState.price;
+        if (NFT.authorFee == 0) {
+            TRADE.artistFee = TRADE.price.mul(authorFee).div(10000);
+        } else {
+            TRADE.artistFee = TRADE.price.mul(NFT.authorFee).div(10000);
         }
-    */
+        TRADE.governanceFee = TRADE.price.mul(govFee).div(10000);
+        TRADE.devFee = TRADE.price.mul(devFee).div(10000);
+        TRADE.reserve = TRADE.price.sub(TRADE.artistFee).sub(TRADE.governanceFee).sub(TRADE.devFee);
+
+        token.safeTransferFrom(address(msg.sender), NFT.author, TRADE.artistFee);
+        token.safeTransferFrom(address(msg.sender), governanceFundAddr, TRADE.governanceFee);
+        token.safeTransferFrom(address(msg.sender), treasureFundAddr, TRADE.devFee);
+        token.safeTransferFrom(address(msg.sender), address(this), TRADE.reserve);
+
+        totalMint = totalMint.add(1);
+        totalTokensCollected = totalTokensCollected.add(NftState.price);
+        totalPaidToAuthors = totalPaidToAuthors.add(TRADE.artistFee);
+        emit NftMint(msg.sender, tokenId, _nftId, NftState.minted, NftState.price);
+
+    }
+
+    function burn(uint256 tokenId) external nonReentrant {
+
+        NftTradeInfo storage TRADE = nftTrade[tokenId];
+
+        require(TRADE.owner == msg.sender, "not nft owner");
+        require(TRADE.reserve > 0, "invalid reserve amount");
+        require(TRADE.burnedIn != 0, "already burned");
+
+        uint8 _nftId = nft.getNftId(tokenId);
+        nft.burn(tokenId);
+
+        TRADE.burnedIn = block.timestamp;
+
+        NftInfoState storage NftState = nftInfoState[_nftId];
+        NftState.burned = NftState.burned.add(1);
+        NftState.lastBurn = block.timestamp;
+
+        token.safeTransfer(address(msg.sender), TRADE.reserve);
+        totalBurn = totalBurn.add(1);
+        totalTokensRefunded = totalTokensRefunded.add(TRADE.reserve);
+
+        emit NftBurn(msg.sender, tokenId);
+    }
+
     function itod(uint256 x) private pure returns (string memory) {
         if (x > 0) {
             string memory str;
@@ -298,7 +319,7 @@ contract NftFarm is Ownable, ReentrancyGuard {
     {
 
         NftInfo storage NFT = nftInfo[_nftId];
-        NftInfoState storage NftState = nftInfoState[_nftId];
+
 
         require(NFT.nftId != 0, "NFT does not exists");
 
@@ -352,25 +373,25 @@ contract NftFarm is Ownable, ReentrancyGuard {
 
     function adminSetDefaultArtistFee(uint256 _fee) external onlyOwner {
         getTotalFee(_fee);
-        FEE_ARTIST = _fee;
+        authorFee = _fee;
     }
 
     function adminSetDefaultGovernanceFee(uint256 _fee) external onlyOwner {
         getTotalFee(_fee);
-        FEE_GOVERNANCE = _fee;
+        govFee = _fee;
     }
 
     function adminSetDefaultTreasureFee(uint256 _fee) external onlyOwner {
         getTotalFee(_fee);
-        FEE_TREASURE = _fee;
+        devFee = _fee;
     }
 
     function getTotalFee(uint256 fee) public view {
-        require(FEE_ARTIST.add(FEE_GOVERNANCE).add(FEE_TREASURE) < 10000, "FEE TOO HIGH");
+        require(authorFee.add(govFee).add(devFee).add(fee) < 10000, "FEE TOO HIGH");
     }
 
-    modifier management( NftInfo storage NFT ){
-        require(mintingManager[msg.sender] == true || (NFT.allowMng==true && NFT.author == msg.sender), "not owner|manager");
+    modifier management(NftInfo storage NFT){
+        require(mintingManager[msg.sender] == true || (NFT.allowMng == true && NFT.author == msg.sender), "not owner|manager");
         _;
     }
 

@@ -69,7 +69,8 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
     uint256 public totalAllocPoint = 0;
     // The block number when ALIFE mining starts.
     uint256 public startBlock;
-
+    // control if we can change the start block
+    bool public farmStarted;
 
     uint256 private constant BASIC = 1;
     uint256 private constant RARE = 2;
@@ -77,6 +78,8 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
     uint256 private constant LEGENDARY = 4;
     mapping( uint256 => string ) private cat_hash;
     mapping( uint256 => uint8[3] ) private categories;
+
+
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
@@ -278,7 +281,7 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
     }
 
     function nft_init( address _nft, address _nftMinter1, address _nftMinter2) public onlyOwner {
-
+        require( farmStarted == false );
         nft = NFT(_nft);
         nftMinter1 = NftFarm(_nftMinter1);
         nftMinter2 = NftFarm(_nftMinter2);
@@ -335,6 +338,17 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
                 return true;
         }
         return false;
+    }
+
+
+    // allow to change start block before farming, if not locked
+    function setStarBlock( uint256 _startBlock ) external onlyOwner{
+        require( farmStarted == false );
+        startBlock = _startBlock;
+    }
+    // we lock block change to avoid changing it after farming start
+    function lockFarm() external onlyOwner{
+        farmStarted = true;
     }
 
 

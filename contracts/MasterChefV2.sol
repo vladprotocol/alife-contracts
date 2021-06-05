@@ -327,15 +327,14 @@ contract MasterChefV2 is Ownable, ReentrancyGuard {
         uint256 length = categories[id].length;
         for( uint256 i = 0 ; i < length ; ++i ){
             uint8 nftId = categories[id][i];
-            if( nftMinter1.getMintsOf(sender, nftId) == 0 )
-                continue;
-            if( nftMinter1.nftIdURIs(nftId).indexOf(cat_hash[id]) != -1 )
-                return true;
-
-            if( nftMinter2.getMintsOf(sender, nftId) == 0 )
-                continue;
-            if( nftMinter2.nftIdURIs(nftId).indexOf(cat_hash[id]) != -1 )
-                return true;
+            if( nftMinter1.getMintsOf(sender, nftId) > 0 ){
+                if( nftMinter1.nftIdURIs(nftId).indexOf(cat_hash[id]) != -1 )
+                    return true;
+            }
+            if( nftMinter2.getMintsOf(sender, nftId) > 0 ){
+                if( nftMinter2.nftIdURIs(nftId).indexOf(cat_hash[id]) != -1 )
+                    return true;
+            }
         }
         return false;
     }

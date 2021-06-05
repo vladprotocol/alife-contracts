@@ -20,6 +20,7 @@ const allowMultipleClaims = true;
 const rarity = "Common";
 const maxMintPerNft = '10';
 const priceMultiplier = '0';
+const deposit = web3.utils.toWei('100');
 
 describe('MasterChefV2', function () {
     beforeEach(async function () {
@@ -38,7 +39,7 @@ describe('MasterChefV2', function () {
 
         await this.alife.setMinterStatus(_deployer, true, {from: _deployer});
         await this.alife.mint(_user, deposit, {from: _deployer});
-        // 
+        //
 
         this.NftFarm1 = await NftFarm.new(
             this.nft.address, this.alife.address,
@@ -86,10 +87,8 @@ describe('MasterChefV2', function () {
     });
 
     describe('TEST POOL', function () {
-        const deposit = web3.utils.toWei('100');
-        
         it('farm without nft', async function () {
-            this.timeout(30000);
+            this.timeout(60000);
             // add(uint256 _allocPoint, IBEP20 _lpToken, uint16 _depositFeeBP, bool _withUpdate, uint8 _mustHaveNft)
             const pid = '0';
             const allocPoint = '1';
@@ -112,10 +111,10 @@ describe('MasterChefV2', function () {
             expect(pendingReward).to.be.bignumber.equal( web3.utils.toWei('1') );
 
         });
-        
 
-        it('FARM / WITH NFT / MUST HAVE BASIC', async function () {
-            this.timeout(30000);
+
+        it('FARM / WITH NFT / MUST HAVE BASIC #1', async function () {
+            this.timeout(60000);
             // add(uint256 _allocPoint, IBEP20 _lpToken, uint16 _depositFeeBP, bool _withUpdate, uint8 _mustHaveNft)
             const pid = '0';
             const allocPoint = '1';
@@ -127,12 +126,12 @@ describe('MasterChefV2', function () {
             await this.pool.add(allocPoint, lpToken, depositFeeBP, withUpdate, mustHaveNft, {from: _deployer});
             await this.LP.approve(this.pool.address, deposit, {from: _user});
             await this.alife.approve(this.NftFarm1.address, deposit, {from: _user});
-            await this.alife.approve(this.NftFarm2.address, deposit, {from: _user});
+            // await this.alife.approve(this.NftFarm2.address, deposit, {from: _user});
 
             await expectRevert(this.pool.deposit(pid, deposit, {from: _user}), 'Must have NFT to deposit');
 
             await this.NftFarm1.mintNFT(2, {from: _user});
-            await this.NftFarm2.mintNFT(2, {from: _user});
+            // await this.NftFarm2.mintNFT(2, {from: _user});
 
             await this.pool.deposit(pid, deposit, {from: _user});
             const poolInfo = await this.pool.userInfo(pid, _user);
@@ -147,10 +146,9 @@ describe('MasterChefV2', function () {
             expect(pendingReward).to.be.bignumber.equal( web3.utils.toWei('1') );
 
         });
-        
 
-        it('FARM / WITH NFT / MUST HAVE RARE', async function () {
-            this.timeout(30000);
+        it('FARM / WITH NFT / MUST HAVE RARE #1', async function () {
+            this.timeout(60000);
             // add(uint256 _allocPoint, IBEP20 _lpToken, uint16 _depositFeeBP, bool _withUpdate, uint8 _mustHaveNft)
             const pid = '0';
             const allocPoint = '1';
@@ -163,12 +161,10 @@ describe('MasterChefV2', function () {
             await this.pool.add(allocPoint, lpToken, depositFeeBP, withUpdate, mustHaveNft, {from: _deployer});
             await this.LP.approve(this.pool.address, deposit, {from: _user});
             await this.alife.approve(this.NftFarm1.address, deposit, {from: _user});
-            await this.alife.approve(this.NftFarm2.address, deposit, {from: _user});
 
             await expectRevert(this.pool.deposit(pid, deposit, {from: _user}), 'Must have NFT to deposit');
 
             await this.NftFarm1.mintNFT(nftId, {from: _user});
-            await this.NftFarm2.mintNFT(nftId, {from: _user});
 
             await this.pool.deposit(pid, deposit, {from: _user});
             const poolInfo = await this.pool.userInfo(pid, _user);
@@ -185,8 +181,9 @@ describe('MasterChefV2', function () {
         });
 
 
-        it('FARM / WITH NFT / MUST HAVE EPIC', async function () {
-            this.timeout(30000);
+
+        it('FARM / WITH NFT / MUST HAVE EPIC #1', async function () {
+            this.timeout(60000);
             // add(uint256 _allocPoint, IBEP20 _lpToken, uint16 _depositFeeBP, bool _withUpdate, uint8 _mustHaveNft)
             const pid = '0';
             const allocPoint = '1';
@@ -198,12 +195,12 @@ describe('MasterChefV2', function () {
 
             await this.pool.add(allocPoint, lpToken, depositFeeBP, withUpdate, mustHaveNft, {from: _deployer});
             await this.LP.approve(this.pool.address, deposit, {from: _user});
-            await this.alife.approve(this.NftFarm1.address, deposit, {from: _user});
+            // await this.alife.approve(this.NftFarm1.address, deposit, {from: _user});
             await this.alife.approve(this.NftFarm2.address, deposit, {from: _user});
 
             await expectRevert(this.pool.deposit(pid, deposit, {from: _user}), 'Must have NFT to deposit');
 
-            await this.NftFarm1.mintNFT(nftId, {from: _user});
+            // await this.NftFarm1.mintNFT(nftId, {from: _user});
             await this.NftFarm2.mintNFT(nftId, {from: _user});
 
             await this.pool.deposit(pid, deposit, {from: _user});
@@ -219,10 +216,13 @@ describe('MasterChefV2', function () {
             expect(pendingReward).to.be.bignumber.equal( web3.utils.toWei('1') );
 
         });
-        
 
-        it('FARM / WITH NFT / MUST HAVE LEGENDARY', async function () {
-            this.timeout(30000);
+
+
+
+
+        it('FARM / WITH NFT / MUST HAVE LEGENDARY #1', async function () {
+            this.timeout(60000);
             // add(uint256 _allocPoint, IBEP20 _lpToken, uint16 _depositFeeBP, bool _withUpdate, uint8 _mustHaveNft)
             const pid = '0';
             const allocPoint = '1';
@@ -234,12 +234,10 @@ describe('MasterChefV2', function () {
 
             await this.pool.add(allocPoint, lpToken, depositFeeBP, withUpdate, mustHaveNft, {from: _deployer});
             await this.LP.approve(this.pool.address, deposit, {from: _user});
-            await this.alife.approve(this.NftFarm1.address, deposit, {from: _user});
             await this.alife.approve(this.NftFarm2.address, deposit, {from: _user});
 
             await expectRevert(this.pool.deposit(pid, deposit, {from: _user}), 'Must have NFT to deposit');
 
-            await this.NftFarm1.mintNFT(nftId, {from: _user});
             await this.NftFarm2.mintNFT(nftId, {from: _user});
 
             await this.pool.deposit(pid, deposit, {from: _user});

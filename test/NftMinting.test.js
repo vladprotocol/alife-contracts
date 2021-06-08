@@ -4,7 +4,7 @@ const {BN, expectRevert, time, expectEvent, constants} = require('@openzeppelin/
 const {expect} = require('chai');
 const Token = contract.fromArtifact('AfterLife');
 const NFT = contract.fromArtifact('NFT');
-const NftFarm = contract.fromArtifact('NftFarm');
+const NftFarm = contract.fromArtifact('NftFarmV2');
 let dev, user;
 const mintAmount = '1';
 const _name = 'Life';//
@@ -12,9 +12,9 @@ const _symbol = 'ALIFE';
 const baseURI = 'ipfs://';
 const ipfsHash = 'QmWB5xPBcFRn8qR4uu1VHt1k9vUrxvbezYv3jDC7WD29ie';
 
-const supply = web3.utils.toWei('6666');
-const totalSupplyDistributed = '6666';
-const price = '66';
+const supply = web3.utils.toWei('100');
+const totalSupplyDistributed = '100';
+const price = web3.utils.toWei('1');
 const alifePerBurn = web3.utils.toWei(price);
 const startBlock = 0;
 const endBlockNumber = 0;
@@ -29,21 +29,30 @@ const max_interval = 3;
 
 describe('NftMinting', function () {
     beforeEach(async function () {
+        this.timeout(60000);
         dev = accounts[0];
         user = accounts[1];
         this.Token = await Token.new({from: dev});
+
+        await this.Token.setMinterStatus(dev, true, {from: dev});
         await this.Token.mint(dev, supply, {from: dev});
+        await this.Token.mint(user, supply, {from: dev});
+
+
         this.NFT = await NFT.new(baseURI, {from: dev});
         this.NftFarm = await NftFarm.new(this.NFT.address, this.Token.address, {from: dev});
         await this.NFT.manageMinters(this.NftFarm.address, true, {from: dev});
+
         const isMinter = await this.NFT.minters(this.NftFarm.address, {from: dev});
-        console.log('------------isMinter', isMinter);
+        expect(isMinter).to.be.equal(true);
+
     });
 
     describe('mint', function () {
 
         it('MUST HAVE TOKEN', async function () {
-            const _nftId='0', _author = user, _startBlock = 1,
+            this.timeout(60000);
+            const _nftId='1', _author = user, _startBlock = 1,
                 _endBlock = '9999999999', _allowMng = true,
                 _rarity = "basic", _uri = "localhost/basic", _authorFee = '3000',
                 _authorName = "user", _authorTwitter = "@user", _status = "1";
@@ -52,9 +61,19 @@ describe('NftMinting', function () {
                 _endBlock, _allowMng, _rarity, _uri, _authorFee,
                 _authorName, _authorTwitter, _status, {from: dev});
 
+            await this.NftFarm.setState(_nftId, price, 1, 0, {from: dev});
+
+            await this.Token.approve(this.NftFarm.address, supply, {from: dev});
             await this.NftFarm.mint(_nftId, {from: dev});
             const ownersOf = await this.NftFarm.getOwnersOf(_nftId, {from: dev});
+            const getTradesByNftIdAndUser = await this.NftFarm.getTradesByNftIdAndUser(dev, _nftId, {from: dev});
+            const getNftIdByUser = await this.NftFarm.getNftIdByUser(dev, {from: dev});
+            const getTradeByTradeId = await this.NftFarm.getTradeByTradeId('1', {from: dev});
             expect(ownersOf[0]).to.be.equal(dev);
+            console.log('ownersOf', ownersOf);
+            console.log('getTradesByNftIdAndUser', getTradesByNftIdAndUser[0].toString());
+            console.log('getNftIdByUser', getNftIdByUser[0].toString());
+            console.log('getTradeByTradeId', getTradeByTradeId);
 
         });
     });

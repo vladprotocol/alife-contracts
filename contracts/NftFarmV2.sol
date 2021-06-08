@@ -141,8 +141,9 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     }
 
     uint256 tradeIdIndex; // global index number for all trades
-    mapping(uint256 => NftTradeInfo) public nftTrade; // store all trades by tradeId
-    mapping(uint8 => mapping(address => uint256[]) ) public nftTradeByUser; // store all trades by user
+    mapping(uint256 => NftTradeInfo) private nftTrade; // store all trades by tradeId
+    mapping(uint8 => mapping(address => uint256[]) ) private nftTradeByUser; // store all trades by user
+    mapping(address => uint8[] ) private nftIdByUser; // store all nftId by user
 
     struct NftSecondaryMarket {
         uint8 nftId;
@@ -331,6 +332,12 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         totalTokensCollected = totalTokensCollected.add(NftState.price);
         totalPaidToAuthors = totalPaidToAuthors.add(TRADE.artistFee);
 
+
+        // if not trade for this nft add it to user list
+        if( nftTradeByUser[_nftId][msg.sender].length == 0 ){
+            nftIdByUser[msg.sender].push(_nftId);
+        }
+
         // store trades for this user
         nftTradeByUser[_nftId][msg.sender].push(TRADE.tradeId);
 
@@ -392,6 +399,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         NftInfo storage NFT = nftInfo[_nftId];
         NftInfoState storage NftState = nftInfoState[_nftId];
 
+        require(_nftId != 0, "invalid nftId");
         require(NFT.nftId == 0, "NFT already exists");
 
         nftIndex.push(_nftId);
@@ -671,35 +679,24 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
 
     //auxiliary market views
 
-    // list of nftId by user
+    // list all unique nft id that this user has minted
     function getNftIdByUser(address user)
         public view returns (uint8[] memory)
     {
-        uint256 nftTotal = nftIndex.length;
-        uint256 total = 0;
-        uint256 index = 0;
-        for (uint8 nftId = 0; nftId < nftTotal; ++nftId) {
-            // NftInfoState storage NFT = nftInfoState[nftId];
-            if( ownersOf[nftId].exists(user) == false ){
-                continue;
-            }
-            total = total.add(1);
-        }
-        uint8[] memory myNftId = new uint8[](total);
-        for (uint8 nftId = 0; nftId < total; ++nftId) {
-            // NftInfoState storage NFT = nftInfoState[nftId];
-            if( ownersOf[nftId].exists(user) == false ){
-                continue;
-            }
-            myNftId[index] = nftId;
-            index = index.add(1);
-        }
-        return myNftId;
+        return nftIdByUser[user];
     }
 
+    // return all trade id numbers by nft id and user wallet
     function getTradesByNftIdAndUser(address user, uint8 nftId)
         public view returns (uint256[] memory)
     {
         return nftTradeByUser[nftId][user];
+    }
+
+    // return a nft mint (aka trade) by trade id number.
+    function getTradeByTradeId(uint256 tradeId)
+        public view returns (NftTradeInfo memory)
+    {
+        return nftTrade[tradeId];
     }
 }

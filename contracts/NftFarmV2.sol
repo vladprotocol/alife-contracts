@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 /**
+Copyright 2021 <vlad, twitter.com/VladFinance, t.me/VladFinanceOfficial>
 Copyright 2021 <bitdeep, twitter.com/bitdeep_oficial, t.me/bitdeep>
 
 Permission is hereby granted, free of charge, to any person obtaining a
@@ -22,6 +23,7 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 
 // 2020 - PancakeSwap Team - https://pancakeswap.com
 // 2021 - bitdeep, twitter.com/bitdeep_oficial, t.me/bitdeep
+// 2021, Vlad Team, t.me/VladFinanceOfficial, https://vlad.finance/
 
 **/
 

@@ -228,9 +228,12 @@ getSellsByNftId(uint8 _nftId)
 
 *This is the auction market, not implemented yet.*
 
-# Vlad VNFT Transer
+# Vlad VNFT Transfer
 
 ## transfer
+
+Allow a user to do a simple transfer.
+User must inform a trade id (trade id is a unique id when user mint a nft.)
 
 ```solidity
 transfer(uint256 tradeId, address to) external nonReentrant

@@ -678,6 +678,12 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
 
     }
 
+    // mock
+    function getSellsByNftId(uint8 _nftId)
+    public view returns (NftTradeInfo memory TRADE[])
+    {
+        return nftIdByUser[user];
+    }
 
     //auxiliary market views
 

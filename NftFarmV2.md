@@ -7,9 +7,9 @@ Once a nft is added it can be minted in a specific amount in a period of time at
 
 Allow users to put a minted nft to sell if allowed to, other users can the buy this nft.
 
-# Vlad VNFT Terciary Marktplace
+# Vlad VNFT Tertiary Marktplace 
 
-Allow management to put a nft in auction mode.
+*(not implemented yet).* Allow management to put a nft in auction mode.
 
 # Vlad VNFT Transer
 
@@ -157,5 +157,55 @@ public view returns (NftTradeInfo memory)
 
 # Marketplaces
 # Vlad VNFT Primary Marktplace
+
+## mint
+
+```solidity
+mint(uint8 _nftId) external nonReentrant
+```
+
+## burn
+
+```solidity
+burn(uint256 tradeId) external nonReentrant
+```
+
 # Vlad VNFT Secondary Marktplace
-# Vlad VNFT Terciary Marktplace
+
+## setNftSellable
+
+```solidity
+setNftSellable(uint8 _nftId, bool _allowSell,
+        uint256 _sellMinPrice)
+```
+
+# sell
+
+```solidity
+sell(uint8 _tokenId, uint256 _price)
+    external nonReentrant
+```
+
+# buy
+
+```solidity
+buy(uint8 _tokenId)
+    external nonReentrant
+```
+
+# getSellsByNftId
+
+```solidity
+getSellsByNftId(uint8 _nftId)
+    public view returns (NftTradeInfo memory TRADE[])
+```
+
+# Vlad VNFT Tertiary Marktplace
+
+# Vlad VNFT Transer
+
+## transfer
+
+```solidity
+transfer(uint256 tradeId, address to) external nonReentrant
+```

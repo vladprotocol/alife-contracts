@@ -160,11 +160,15 @@ public view returns (NftTradeInfo memory)
 
 ## mint
 
+*Allow user to mint a nft and pay fees to authors, governance and dev.*
+
 ```solidity
 mint(uint8 _nftId) external nonReentrant
 ```
 
 ## burn
+
+*Allow user to burn a nft and get some token (money) back.*
 
 ```solidity
 burn(uint256 tradeId) external nonReentrant
@@ -174,26 +178,46 @@ burn(uint256 tradeId) external nonReentrant
 
 ## setNftSellable
 
+*Manage if a nft can be selleable in the secondary market, it means that user can sell a minted nft.*
+
+Options are:
+
+- **_allowSell**: if true, allow this nft to be selleable in the secondary market.
+- **_sellMinPrice**: manager can set minimum price that this nft can be sold.
+
 ```solidity
 setNftSellable(uint8 _nftId, bool _allowSell,
-        uint256 _sellMinPrice)
+uint256 _sellMinPrice)
+external
+mintingManagers
 ```
 
-# sell
+## sell
+
+*Allow a user to put a minted nft to seel by a specific price (if allowed)*
+
+Options are:
+- **_tokenId**: the unique internal token id generated of this nft mint.
+- **_price**: the price that this nft can be sold.
 
 ```solidity
 sell(uint8 _tokenId, uint256 _price)
     external nonReentrant
 ```
 
-# buy
+## buy
+
+*Allow user to buy a nft that another use put to sell in the secondary market.*
+
+Options are:
+- **_tokenId**: the unique internal token id generated of this nft mint.
 
 ```solidity
 buy(uint8 _tokenId)
     external nonReentrant
 ```
 
-# getSellsByNftId
+## getSellsByNftId
 
 ```solidity
 getSellsByNftId(uint8 _nftId)
@@ -201,6 +225,8 @@ getSellsByNftId(uint8 _nftId)
 ```
 
 # Vlad VNFT Tertiary Marktplace
+
+*This is the auction market, not implemented yet.*
 
 # Vlad VNFT Transer
 

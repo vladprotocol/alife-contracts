@@ -21,10 +21,12 @@ library Uint256ArrayLib {
      * @param self Storage array containing uint256 type variables
      * @param element the element to add in the array
      */
-    function pushValue(Values storage self, uint256 element) internal {
+    function pushValue(Values storage self, uint256 element) internal returns (bool) {
         if (!exists(self, element)) {
             self._items.push(element);
+            return true;
         }
+        return false;
     }
 
     /**

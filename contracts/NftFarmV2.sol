@@ -582,7 +582,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     // use to transfer your nft to someone (to gif for example)
     function transfer(uint256 tradeId, address to) external nonReentrant {
         NftTradeInfo storage TRADE = nftTrade[tradeId];
-        NftSecondaryTradeInfo storage SECONDARY_TRADE = nftSecondaryTradeInfo[tradeId];
+        // NftSecondaryTradeInfo storage SECONDARY_TRADE = nftSecondaryTradeInfo[tradeId];
         require( TRADE.tradeId > 0, "nft not found");
         require( TRADE.owner == address(msg.sender), "not nft owner");
         require( TRADE.burnedIn > 0, "burned");
@@ -621,7 +621,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
 
         require(TRADE.owner != msg.sender, "not owner");
         require(_price >= MARKET.sellMinPrice, "price bellow min price");
-        bool added = MARKET.listOfOpenSells.pushValue(tradeId); // added only once
+        MARKET.listOfOpenSells.pushValue(tradeId); // added only once
 
         NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[tradeId];
         secondaryTrade.sellPrice = _price;
@@ -630,7 +630,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     }
 
     // list all trade id from a specific nft open to sell
-    function getOpenTradesByNftId(uint8 _nftId)
+    function getListOpenTradesByNftId(uint8 _nftId)
     public view returns (uint256[] memory sells)
     {
         return nftSecondaryMarket[_nftId].listOfOpenSells.getAllValues();
@@ -641,35 +641,32 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     public view returns (NftTradeInfo[] memory TRADES)
     {
         uint256 size = nftSecondaryMarket[_nftId].listOfOpenSells.size();
-        NftTradeInfo[] memory TRADES = new NftTradeInfo(size);
+        NftTradeInfo[] memory listOfTrades = new NftTradeInfo[](size);
         for (uint256 i = 0; i < size; i++) {
             uint256 tradeId = nftSecondaryMarket[_nftId].listOfOpenSells.getValueAtIndex(i);
-            NftTradeInfo storage TRADE = nftTrade[tradeId];
-            TRADES.push(TRADE);
+            listOfTrades[i] = nftTrade[tradeId];
         }
-        return TRADES;
+        return listOfTrades;
     }
 
-    function buy(uint8 _tokenId)
+    function buy(uint8 tradeId)
     external nonReentrant
     {
-        NftTradeInfo storage TRADE = nftTrade[_tokenId];
+        require(tradeId > 0, "NFT not minted");
+        NftTradeInfo storage TRADE = nftTrade[tradeId];
         NftSecondaryMarket storage MARKET = nftSecondaryMarket[TRADE.nftId];
-        NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[tradeId];
         // NftInfo storage NFT = nftInfo[TRADE.nftId];
         NftInfoState storage NftState = nftInfoState[TRADE.nftId];
-
-
-        require(_tokenId > 0, "NFT not minted");
+        NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[tradeId];
         require(MARKET.allowSell == true, "NFT not sellable");
         require(TRADE.owner != msg.sender, "no wash trading");
+        require(TRADE.burnedIn == 0, "burned");
         require(secondaryTrade.sellPrice > 0, "not for sell");
-        require(secondaryTrade.burnedIn > 0, "burned");
 
-        buyDoPayment(_tokenId);
+        buyDoPayment(tradeId);
 
-        MARKET.totalSells = MARKET.totalSells.add(1);
-        MARKET.lastSellPrice = TRADE.sellPrice;
+        MARKET.qtdSells = MARKET.qtdSells.add(1);
+        MARKET.lastSellPrice = secondaryTrade.sellPrice;
         MARKET.lastSellIn = block.timestamp;
 
         NftState.lastOwner = msg.sender; // new owner
@@ -681,11 +678,11 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
 
 
     function buyDoPayment(uint8 tradeId) internal {
-
-        NftInfo storage NFT = nftInfo[TRADE.nftId];
         NftTradeInfo storage TRADE = nftTrade[tradeId];
+        NftInfo storage NFT = nftInfo[TRADE.nftId];
         NftInfoState storage STATE = nftInfoState[TRADE.nftId];
-        NftSecondaryMarket storage secondaryTrade = nftSecondaryMarket[tradeId];
+        NftSecondaryMarket storage secondaryMarketInfo = nftSecondaryMarket[tradeId];
+        NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[tradeId];
 
         // transfer tokens from new owner to old owner
         uint256 _authorFee = NFT.authorFee;
@@ -694,10 +691,10 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
             // default author fee
         }
 
-        uint256 _artistFee = TRADE.price.mul(_authorFee).div(10000);
-        uint256 _governanceFee = TRADE.price.mul(platformFees.govFee).div(10000);
-        uint256 _devFee = TRADE.price.mul(platformFees.devFee).div(10000);
-        uint256 _totalSold = TRADE.price.sub(_artistFee).sub(_governanceFee).sub(_devFee);
+        uint256 _artistFee = secondaryTrade.sellPrice.mul(_authorFee).div(10000);
+        uint256 _governanceFee = secondaryTrade.sellPrice.mul(platformFees.govFee).div(10000);
+        uint256 _devFee = secondaryTrade.sellPrice.mul(platformFees.devFee).div(10000);
+        uint256 _totalSold = secondaryTrade.sellPrice.sub(_artistFee).sub(_governanceFee).sub(_devFee);
 
         // do platform transfers
         STATE.token.safeTransferFrom(address(msg.sender), NFT.author, _artistFee);
@@ -707,18 +704,17 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         // after fees, pay old owner:
         STATE.token.safeTransferFrom(address(msg.sender), TRADE.owner, _totalSold);
 
-        NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[_tokenId];
         // accumulate fees paid
-        MARKET.totalArtistFee = MARKET.artistFee.add(_artistFee);
-        MARKET.totalGovernanceFee = MARKET.governanceFee.add(_governanceFee);
-        MARKET.totalDevFee = MARKET.devFee.add(_devFee);
-        MARKET.totalCollected = MARKET.totalCollected.add(_totalSold);
+        secondaryMarketInfo.totalArtistFee = secondaryMarketInfo.totalArtistFee.add(_artistFee);
+        secondaryMarketInfo.totalGovernanceFee = secondaryMarketInfo.totalGovernanceFee.add(_governanceFee);
+        secondaryMarketInfo.totalDevFee = secondaryMarketInfo.totalDevFee.add(_devFee);
+        secondaryMarketInfo.totalCollected = secondaryMarketInfo.totalCollected.add(_totalSold);
 
         // transfer from old owner to hew owner
-        STATE.nft.safeTransferFrom(TRADE.owner, msg.sender, _tokenId);
+        STATE.nft.safeTransferFrom(TRADE.owner, msg.sender, TRADE.tokenId);
 
         // remove this trade from the list of open trades
-        MARKET.listOfOpenSells.removeValue(tradeId); // added only once
+        secondaryMarketInfo.listOfOpenSells.removeValue(tradeId); // added only once
     }
 
 

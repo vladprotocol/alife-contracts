@@ -32,5 +32,5 @@ interface INFT {
     function getNftId(uint256 _tokenId) external view returns (uint8);
     function burn(uint256 _tokenId) external;
     function safeTransferFrom(address from, address to, uint256 tokenId) external;
-    function ownerOf(uint256 tokenId) external view virtual override returns (address);
+    function ownerOf(uint256 tokenId) external view returns (address);
 }

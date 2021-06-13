@@ -353,9 +353,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
 
 
     function burnByNftId(uint8 _nftId) external nonReentrant {
-        uint256 size = nftTradeByUser[_nftId][msg.sender].size();
-        require( size > 0, "no nft minted" );
-        uint256 tradeId = nftTradeByUser[_nftId][msg.sender].getValueAtIndex(0);
+        uint256 tradeId = getTradeIdByNftId(msg.sender, _nftId);
         _burn(tradeId);
     }
     function burn(uint256 tradeId) public nonReentrant {
@@ -595,13 +593,22 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         return (info, state);
     }
 
+    function transferByNftId(uint8 nftId, address to) external nonReentrant {
+        // call "setApprovalForAll(address(this), true)" before transfer
+        uint256 tradeId = getTradeIdByNftId(msg.sender, nftId);
+        _transfer(tradeId, to);
+    }
     // use to transfer your nft to someone (to gif for example)
     function transfer(uint256 tradeId, address to) external nonReentrant {
+        // call "setApprovalForAll(address(this), true)" before transfer
+        _transfer(tradeId, to);
+    }
+    function _transfer(uint256 tradeId, address to) internal {
         NftTradeInfo storage TRADE = nftTrade[tradeId];
         // NftSecondaryTradeInfo storage SECONDARY_TRADE = nftSecondaryTradeInfo[tradeId];
         require( TRADE.tradeId > 0, "nft not found");
         require( TRADE.owner == address(msg.sender), "not nft owner");
-        require( TRADE.burnedIn > 0, "burned");
+        require( TRADE.burnedIn == 0, "burned");
         NftInfoState storage NftState = nftInfoState[TRADE.nftId];
         // security check: if user transfer his nft via other contract, this should fail.
         require(NftState.nft.ownerOf(TRADE.tokenId) == address(msg.sender), "not owner");
@@ -761,5 +768,13 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         public view returns (NftTradeInfo memory)
     {
         return nftTrade[tradeId];
+    }
+
+    function getTradeIdByNftId(address user, uint8 nftId)
+        public view returns (uint256)
+    {
+        uint256 size = nftTradeByUser[nftId][user].size();
+        require( size > 0, "no nft minted" );
+        return nftTradeByUser[nftId][user].getValueAtIndex(0);
     }
 }

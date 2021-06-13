@@ -174,13 +174,54 @@ describe('NftMinting', function () {
 
             await this.NFT.setApprovalForAll(this.NftFarm.address, true, {from: dev});
             await this.NftFarm.transferByNftId(_nftId, user, {from: dev});
+            await this.NftFarm.transferByNftId(_nftId, user, {from: dev});
+            await this.NftFarm.transferByNftId(_nftId, user, {from: dev});
 
             ownersOf = await this.NftFarm.getOwnersOf(_nftId, {from: dev});
             expect(ownersOf[0]).to.be.equal(user);
             // console.log('ownersOf', ownersOf);
 
+            await expectRevert(this.NftFarm.transferByNftId(_nftId, user, {from: dev}),'no nft minted');
+
+
         });
 
+
+        /*
+        it('1) SELL/BUY NFT', async function () {
+            this.timeout(60000);
+            const _nftId='1', _author = user, _startBlock = 1,
+                _endBlock = '9999999999', _allowMng = true,
+                _rarity = "basic", _uri = "localhost/basic", _authorFee = '3000',
+                _authorName = "user", _authorTwitter = "@user", _status = "1";
+
+            await this.NftFarm.add(_nftId, _author, _startBlock,
+                _endBlock, _allowMng, _rarity, _uri, _authorFee,
+                _authorName, _authorTwitter, _status, {from: dev});
+
+            await this.NftFarm.setState(_nftId, price, 3, 0, {from: dev});
+            await this.NftFarm.setNftSellable(_nftId, true, price, {from: dev});
+
+            await this.Token.approve(this.NftFarm.address, supply, {from: dev});
+            await this.NftFarm.mint(_nftId, {from: dev});
+            await this.NftFarm.mint(_nftId, {from: dev});
+            await this.NftFarm.mint(_nftId, {from: dev});
+
+            let ownersOf = await this.NftFarm.getOwnersOf(_nftId, {from: dev});
+            expect(ownersOf[0]).to.be.equal(dev);
+
+            await this.NFT.setApprovalForAll(this.NftFarm.address, true, {from: dev});
+            await this.NftFarm.transferByNftId(_nftId, user, {from: dev});
+
+            ownersOf = await this.NftFarm.getOwnersOf(_nftId, {from: dev});
+            expect(ownersOf[0]).to.be.equal(user);
+            // console.log('ownersOf', ownersOf);
+
+            await expectRevert(this.NftFarm.transferByNftId(_nftId, user, {from: dev}),'not nft owner');
+
+
+        });
+        */
     });
     /*
         describe('mintNFT', function () {

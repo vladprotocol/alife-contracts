@@ -614,8 +614,13 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         require(NftState.nft.ownerOf(TRADE.tokenId) == address(msg.sender), "not owner");
         NftState.nft.safeTransferFrom(msg.sender, to, TRADE.tokenId);
         TRADE.owner = to; // update trade owner to new owner
+
         ownersOf[TRADE.nftId].removeAddress(msg.sender); // remove old owner
         ownersOf[TRADE.nftId].pushAddress(to); // add new owner
+
+        nftTradeByUser[TRADE.nftId][msg.sender].removeValue(tradeId); // remove old owner
+        nftTradeByUser[TRADE.nftId][to].pushValue(tradeId); // add new owner
+
         emit NftTransfer(msg.sender, to, tradeId);
     }
 

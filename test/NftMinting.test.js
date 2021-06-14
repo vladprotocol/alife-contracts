@@ -15,6 +15,8 @@ const ipfsHash = 'QmWB5xPBcFRn8qR4uu1VHt1k9vUrxvbezYv3jDC7WD29ie';
 const supply = web3.utils.toWei('100');
 const totalSupplyDistributed = '100';
 const price = web3.utils.toWei('1');
+const halfPrice = web3.utils.toWei('0.5');
+const doublePrice = web3.utils.toWei('2');
 const alifePerBurn = web3.utils.toWei(price);
 const startBlock = 0;
 const endBlockNumber = 0;
@@ -150,7 +152,7 @@ describe('NftMinting', function () {
         });
         */
 
-
+/*
         it('1) TRANSFER A NFT', async function () {
             this.timeout(60000);
             const _nftId='1', _author = user, _startBlock = 1,
@@ -185,9 +187,9 @@ describe('NftMinting', function () {
 
 
         });
+*/
 
 
-        /*
         it('1) SELL/BUY NFT', async function () {
             this.timeout(60000);
             const _nftId='1', _author = user, _startBlock = 1,
@@ -203,25 +205,36 @@ describe('NftMinting', function () {
             await this.NftFarm.setNftSellable(_nftId, true, price, {from: dev});
 
             await this.Token.approve(this.NftFarm.address, supply, {from: dev});
+            await this.Token.approve(this.NftFarm.address, supply, {from: user});
             await this.NftFarm.mint(_nftId, {from: dev});
             await this.NftFarm.mint(_nftId, {from: dev});
             await this.NftFarm.mint(_nftId, {from: dev});
 
-            let ownersOf = await this.NftFarm.getOwnersOf(_nftId, {from: dev});
-            expect(ownersOf[0]).to.be.equal(dev);
+            let trades = await this.NftFarm.getTradesByNftIdAndUser(dev, _nftId, {from: dev});
+            // console.log('trades', arrayBn2S(trades));
+            // expect(ownersOf[0]).to.be.equal(dev);
 
-            await this.NFT.setApprovalForAll(this.NftFarm.address, true, {from: dev});
-            await this.NftFarm.transferByNftId(_nftId, user, {from: dev});
+            const tradeId0 = trades[0]; // 0
+            const tradeId1 = trades[1]; // 1
+            const tradeId2 = trades[2]; // 2
+            await this.NFT.setApprovalForAll(this.NftFarm.address, price, {from: dev});
+            await expectRevert(this.NftFarm.sell(tradeId0, halfPrice, {from: dev}), 'price bellow min price');
 
-            ownersOf = await this.NftFarm.getOwnersOf(_nftId, {from: dev});
-            expect(ownersOf[0]).to.be.equal(user);
-            // console.log('ownersOf', ownersOf);
+            await this.NftFarm.sell(tradeId0, doublePrice, {from: dev});
+            await this.NftFarm.sell(tradeId1, price, {from: dev});
+            await this.NftFarm.sell(tradeId2, price, {from: dev});
 
-            await expectRevert(this.NftFarm.transferByNftId(_nftId, user, {from: dev}),'not nft owner');
+            let getListOpenTradesByNftId = await this.NftFarm.getListOpenTradesByNftId(_nftId, {from: dev});
+            // console.log('getListOpenTradesByNftId', getListOpenTradesByNftId);
 
+            await this.NftFarm.buy(tradeId0, {from: user});
+            await this.NftFarm.buy(tradeId1, {from: user});
+            await this.NftFarm.buy(tradeId2, {from: user});
+
+            await expectRevert(this.NftFarm.buy(tradeId0, {from: dev}),'buy: not for sell');
 
         });
-        */
+
     });
     /*
         describe('mintNFT', function () {

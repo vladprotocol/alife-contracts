@@ -61,8 +61,76 @@ describe('NftMinting', function () {
 
     });
 
+
+    describe('nft info', function () {
+
+        it('nft ownership trnasfer', async function () {
+            this.timeout(60000);
+            const _nftIdA = '10', _nftIdB = '11', _author = user, _startBlock = 1,
+                _endBlock = '9999999999', _allowMng = true,
+                _rarity = "basic", _uri = "localhost/basic", _authorFee = '3000',
+                _authorName = "user", _authorTwitter = "@user", _status = "1";
+
+            await this.NftFarm.add(_nftIdA, _author, _startBlock,
+                _endBlock, _allowMng, _rarity, _uri, _authorFee,
+                _authorName, _authorTwitter, _status, {from: dev});
+
+            await this.NftFarm.setState(_nftIdA, price, 3, 0, {from: dev});
+
+            await this.NftFarm.add(_nftIdB, _author, _startBlock,
+                _endBlock, _allowMng, _rarity, _uri, _authorFee,
+                _authorName, _authorTwitter, _status, {from: dev});
+
+            await this.NftFarm.setState(_nftIdB, price, 3, 0, {from: dev});
+
+            await this.Token.approve(this.NftFarm.address, supply, {from: dev});
+            await this.Token.approve(this.NftFarm.address, supply, {from: user});
+
+            await this.NftFarm.mint(_nftIdA, {from: dev});
+            await this.NftFarm.mint(_nftIdA, {from: dev});
+            await this.NftFarm.mint(_nftIdA, {from: dev});
+
+            await this.NftFarm.mint(_nftIdB, {from: user});
+            await this.NftFarm.mint(_nftIdB, {from: user});
+            await this.NftFarm.mint(_nftIdB, {from: user});
+
+            let ownersOfA = await this.NftFarm.getOwnersOf(_nftIdA, {from: dev});
+            let ownersOfB = await this.NftFarm.getOwnersOf(_nftIdB, {from: user});
+            expect(ownersOfA[0]).to.be.equal(dev);
+            expect(ownersOfB[0]).to.be.equal(user);
+
+            await this.NFT.setApprovalForAll(this.NftFarm.address, true, {from: dev});
+            await this.NftFarm.transferByNftId(_nftIdA, user, {from: dev});
+            await this.NftFarm.transferByNftId(_nftIdA, user, {from: dev});
+            await this.NftFarm.transferByNftId(_nftIdA, user, {from: dev});
+
+            await expectRevert(this.NftFarm.transferByNftId(_nftIdA, user, {from: dev}), 'no nft minted');
+
+            ownersOf = await this.NftFarm.getOwnersOf(_nftIdA, {from: dev});
+            expect(ownersOf[0]).to.be.equal(user);
+
+            const getMintedDev = await this.NftFarm.getMinted(dev, {from: dev});
+            const getMintedUser = await this.NftFarm.getMinted(user, {from: user});
+
+            console.log('ownersOf', ownersOf);
+            console.log('dev ', dev);
+            console.log('dev minted', getMintedDev[0][0].toString());
+            console.log('dev lastOwner', getMintedDev[2][0].toString());
+            console.log('dev myMints', getMintedDev[5][0].toString());
+
+            console.log('USER ', user);
+            console.log('USER lastOwner', getMintedUser[2][0].toString());
+            console.log('USER myMints', getMintedUser[5][0].toString());
+
+
+
+        });
+
+    });
+
+    /*
     describe('NFT MINTING & BURN', function () {
-        /*
+
         it('1) MINT A NFT', async function () {
             this.timeout(60000);
             const _nftId='1', _author = user, _startBlock = 1,
@@ -150,9 +218,7 @@ describe('NftMinting', function () {
 
 
         });
-        */
 
-/*
         it('1) TRANSFER A NFT', async function () {
             this.timeout(60000);
             const _nftId='1', _author = user, _startBlock = 1,
@@ -187,7 +253,6 @@ describe('NftMinting', function () {
 
 
         });
-*/
 
 
         it('1) SELL/BUY NFT', async function () {
@@ -236,7 +301,7 @@ describe('NftMinting', function () {
         });
 
     });
-    /*
+
         describe('mintNFT', function () {
 
             it('MUST HAVE TOKEN', async function () {

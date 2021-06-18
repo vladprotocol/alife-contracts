@@ -231,9 +231,9 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
 
         for (uint256 index = 0; index < total; ++index) {
             uint8 nftId = minted[index];
-            NftInfoState storage NFT = nftInfoState[nftId];
-            lastOwner[index] = NFT.lastOwner;
-            mintedAmounts[index] = NFT.minted;
+            NftInfoState storage NftState = nftInfoState[nftId];
+            lastOwner[index] = NftState.lastOwner;
+            mintedAmounts[index] = NftState.minted;
             myMints[index] = getMintsOf(_user, nftId);
         }
 
@@ -614,7 +614,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         require(NftState.nft.ownerOf(TRADE.tokenId) == address(msg.sender), "not owner");
         NftState.nft.safeTransferFrom(msg.sender, to, TRADE.tokenId);
         TRADE.owner = to; // update trade owner to new owner
-        NftState.lastOwner = msg.sender; // new owner
+        NftState.lastOwner = to; // new owner
 
         ownersOf[TRADE.nftId].removeAddress(msg.sender); // remove old owner
         ownersOf[TRADE.nftId].pushAddress(to); // add new owner

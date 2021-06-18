@@ -12,8 +12,10 @@ library AddrArrayLib {
     struct Addresses {
         address[]  _items;
     }
-    function pushAddress(Addresses storage self, address element) internal {
-        if (!exists(self, element)) {
+    function pushAddress(Addresses storage self, address element, bool allowDup) internal {
+        if( allowDup ){
+            self._items.push(element);
+        }else if (!exists(self, element)) {
             self._items.push(element);
         }
     }

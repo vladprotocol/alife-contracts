@@ -128,7 +128,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     // state info, like minting, minted, burned
     mapping(uint8 => NftInfoState) public nftInfoState;
     // list of all nft minting by nft id
-    mapping(uint8 => uint256[]) public listOfTradesByNftId;
+    mapping(uint8 => uint256[]) private listOfTradesByNftId;
 
     // primary trade info
     struct NftTradeInfo {
@@ -178,11 +178,11 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
 
 
     // filters
-    mapping(string => uint8[]) public listOfNftByRarity;
-    mapping(string => uint8[]) public listOfNftByAuthor;
+    mapping(string => uint8[]) private listOfNftByRarity;
+    mapping(string => uint8[]) private listOfNftByAuthor;
 
-    mapping(string => uint256) public authorIdByName;
-    mapping(string => uint256) public rarityIdByName;
+    mapping(string => uint256) private authorIdByName;
+    mapping(string => uint256) private rarityIdByName;
     string[] public listOfAuthors;
     string[] public listOfRarity;
 
@@ -304,7 +304,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
 
         require(NftState.maxMint == 0 || NftState.minted <= NftState.maxMint, "Max minting reached");
 
-        ownersOf[_nftId].pushAddress(msg.sender);
+        ownersOf[_nftId].pushAddress(msg.sender, true);
 
         // we increment before, then we can check if index is != 0
         tradeIdPool = tradeIdPool.add(1); // we finished here, increment trade index by i
@@ -548,47 +548,56 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         _;
     }
 
-    function getNftByAuthor(string memory author) public view returns
-    (NftInfo[] memory info, NftInfoState[] memory state)
+    function getNftIdByAuthor(string memory author)
+    public view returns (uint8[] memory)
     {
+        return listOfNftByAuthor[author];
+    }
+    function getNftIdByRarity(string memory author)
+    public view returns (uint8[] memory)
+    {
+        return listOfNftByAuthor[author];
+    }
+    function getNftByAuthor(string memory author) public view returns
+    (NftInfo[] memory nftInfoByAuthor, NftInfoState[] memory nftInfoStateByAuthor)
+    {
+        uint8[] memory list = getNftIdByAuthor(author);
         uint256 authorId = authorIdByName[author];
-        uint8[] memory list = listOfNftByAuthor[author];
-        uint256 total = list.length;
-        uint256 pos = 0;
-        for (uint8 index = 0; index < total; ++index) {
-            NftInfo memory _info = nftInfo[index];
-            if (_info.authorId != authorId) {
+
+        NftInfo[] memory info = new NftInfo[](list.length);
+        NftInfoState[] memory state = new NftInfoState[](list.length);
+
+        uint256 i = 0;
+        for (uint8 index = 0; index < list.length; ++index) {
+            uint8 nftId = list[index];
+            if (nftInfo[nftId].authorId != authorId) {
                 continue;
             }
-            NftInfoState memory _state = nftInfoState[index];
-            info[pos] = _info;
-            state[pos] = _state;
-            pos = pos.add(1);
+            info[i] = nftInfo[nftId];
+            state[i] = nftInfoState[nftId];
+            i = i.add(1);
         }
         return (info, state);
     }
 
     function getNftByRarity(string memory rarity) public view returns
-    (NftInfo[] memory, NftInfoState[] memory)
+    (NftInfo[] memory nftInfoByRarity, NftInfoState[] memory nftInfoStateByRarity)
     {
-        uint8[] memory list = listOfNftByRarity[rarity];
-        uint256 total = list.length;
-        NftInfo[] memory info = new NftInfo[](total);
-        NftInfoState[] memory state = new NftInfoState[](total);
-
+        uint8[] memory list = getNftIdByRarity(rarity);
         uint256 rarityId = rarityIdByName[rarity];
 
-        uint256 pos = 0;
-        for (uint8 index = 0; index < total; ++index) {
+        NftInfo[] memory info = new NftInfo[](list.length);
+        NftInfoState[] memory state = new NftInfoState[](list.length);
+
+        uint256 i = 0;
+        for (uint8 index = 0; index < list.length; ++index) {
             uint8 nftId = list[index];
-            NftInfoState memory _state = nftInfoState[nftId];
-            if (_state.rarityId != rarityId) {
+            if (nftInfoState[nftId].rarityId != rarityId) {
                 continue;
             }
-            NftInfo memory _info = nftInfo[nftId];
-            info[pos] = _info;
-            state[pos] = _state;
-            pos = pos.add(1);
+            info[i] = nftInfo[nftId];
+            state[i] = nftInfoState[nftId];
+            i = i.add(1);
         }
         return (info, state);
     }
@@ -617,7 +626,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         NftState.lastOwner = to; // new owner
 
         ownersOf[TRADE.nftId].removeAddress(msg.sender); // remove old owner
-        ownersOf[TRADE.nftId].pushAddress(to); // add new owner
+        ownersOf[TRADE.nftId].pushAddress(to, true); // add new owner
 
         nftTradeByUser[TRADE.nftId][msg.sender].removeValue(tradeId); // remove old owner
         nftTradeByUser[TRADE.nftId][to].pushValue(tradeId); // add new owner
@@ -632,8 +641,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     mintingManagers
     {
         NftSecondaryMarket storage NFT = nftSecondaryMarket[_nftId];
-        NftInfoState storage NftState = nftInfoState[_nftId];
-        require(NftState.nftId > 0, "NFT does not exists");
+        require(nftInfoState[_nftId].nftId > 0, "NFT does not exists");
         require(_sellMinPrice > 0, "invalid sell min price");
         NFT.allowSell = _allowSell;
         NFT.sellMinPrice = _sellMinPrice;
@@ -702,7 +710,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
 
 
         ownersOf[TRADE.nftId].removeAddress(TRADE.owner); // remove old owner
-        ownersOf[TRADE.nftId].pushAddress(msg.sender); // add new owner
+        ownersOf[TRADE.nftId].pushAddress(msg.sender, true); // add new owner
 
         nftTradeByUser[TRADE.nftId][TRADE.owner].removeValue(tradeId); // remove old owner
         nftTradeByUser[TRADE.nftId][msg.sender].pushValue(tradeId); // add new owner
@@ -798,4 +806,5 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         require( size > 0, "no nft minted" );
         return nftTradeByUser[nftId][user].getValueAtIndex(0);
     }
+
 }

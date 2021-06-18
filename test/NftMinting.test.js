@@ -113,14 +113,16 @@ describe('NftMinting', function () {
             const getMintedUser = await this.NftFarm.getMinted(user, {from: user});
 
             console.log('ownersOf', ownersOf);
+            console.log('minted', arrayBn2S(getMintedDev[0]) );
+
             console.log('dev ', dev);
-            console.log('dev minted', getMintedDev[0][0].toString());
+
             console.log('dev lastOwner', getMintedDev[2][0].toString());
-            console.log('dev myMints', getMintedDev[5][0].toString());
+            console.log('dev myMints', arrayBn2S(getMintedDev[5]) );
 
             console.log('USER ', user);
             console.log('USER lastOwner', getMintedUser[2][0].toString());
-            console.log('USER myMints', getMintedUser[5][0].toString());
+            console.log('USER myMints', arrayBn2S(getMintedUser[5]) );
 
 
 

@@ -1,10 +1,22 @@
 // SPDX-License-Identifier: UNLICENSED
-
+pragma solidity ^0.6.12;
 library StringUtils {
+    function addTo( string[] storage arr, string memory v )
+    public returns (bool)
+    {
+        for (uint i = 0; i < arr.length; i ++){
+            string memory c = arr[i];
+            if( equal(v,c) ){
+                return false;
+            }
+        }
+        arr.push(v);
+        return true;
+    }
     /// @dev Does a byte-by-byte lexicographical comparison of two strings.
     /// @return a negative number if `_a` is smaller, zero if they are equal
     /// and a positive numbe if `_b` is smaller.
-    function compare(string memory _a, string memory _b) internal view returns (int) {
+    function compare(string memory _a, string memory _b) internal pure returns (int) {
         bytes memory a = bytes(_a);
         bytes memory b = bytes(_b);
         uint minLength = a.length;
@@ -23,11 +35,11 @@ library StringUtils {
             return 0;
     }
     /// @dev Compares two strings and returns true iff they are equal.
-    function equal(string memory _a, string memory _b) internal view returns (bool) {
+    function equal(string memory _a, string memory _b) internal pure returns (bool) {
         return compare(_a, _b) == 0;
     }
     /// @dev Finds the index of the first occurrence of _needle in _haystack
-    function indexOf(string memory _haystack, string memory _needle) internal view returns (int)
+    function indexOf(string memory _haystack, string memory _needle) internal pure returns (int)
     {
         bytes memory h = bytes(_haystack);
         bytes memory n = bytes(_needle);

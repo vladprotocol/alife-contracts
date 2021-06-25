@@ -39,6 +39,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import './libs/AddrArrayLib.sol';
 import './libs/Uint256ArrayLib.sol';
 import './libs/Uint8ArrayLib.sol';
+import './libs/StringArrayLib.sol';
 
 pragma experimental ABIEncoderV2;
 pragma solidity ^0.6.12;
@@ -50,6 +51,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     using AddrArrayLib for AddrArrayLib.Addresses;
     using Uint256ArrayLib for Uint256ArrayLib.Values;
     using Uint8ArrayLib for Uint8ArrayLib.Values;
+    using StringArrayLib for StringArrayLib.Values;
 
     INFT public nft;    // default platform nft
     IBEP20 public token;// default platform payment token
@@ -183,8 +185,8 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
 
     mapping(string => uint256) private authorIdByName;
     mapping(string => uint256) private rarityIdByName;
-    string[] public listOfAuthors;
-    string[] public listOfRarity;
+    StringArrayLib.Values private listOfAuthors;
+    StringArrayLib.Values private listOfRarity;
 
     // events
     event NftAdded(uint8 indexed nftId, address indexed author, uint256 startBlock, uint256 endBlock);
@@ -444,13 +446,14 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         uint8[] storage nftByRarity = listOfNftByRarity[_rarity];
         uint8[] storage nftByAuthors = listOfNftByAuthor[_authorName];
 
-        if (nftByRarity.length == 0) {
-            listOfRarity.push(_rarity);
-            rarityIdByName[_rarity] = listOfRarity.length;
+        if ( listOfRarity.pushValue(_rarity) ) {
+            // generate rarityID by array index.
+            rarityIdByName[_rarity] = listOfRarity.size();
         }
-        if (nftByAuthors.length == 0) {
-            listOfAuthors.push(_authorName);
-            authorIdByName[_authorName] = listOfAuthors.length;
+
+        if ( listOfAuthors.pushValue(_authorName) ) {
+            // generate authorID by array index.
+            authorIdByName[_authorName] = listOfAuthors.size();
         }
 
         NFT.authorId = authorIdByName[_authorName];
@@ -473,6 +476,10 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         NftInfo storage NFT = nftInfo[_nftId];
 
         require(NFT.nftId != 0, "NFT does not exists");
+
+        // add new author/rarity if changed
+        listOfAuthors.pushValue(_authorName);
+        listOfRarity.pushValue(_rarity);
 
         NFT.author = _author;
         NFT.authorFee = _authorFee;
@@ -556,7 +563,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     function getNftIdByRarity(string memory author)
     public view returns (uint8[] memory)
     {
-        return listOfNftByAuthor[author];
+        return listOfNftByRarity[author];
     }
     function getNftByAuthor(string memory author) public view returns
     (NftInfo[] memory nftInfoByAuthor, NftInfoState[] memory nftInfoStateByAuthor)
@@ -805,6 +812,18 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         uint256 size = nftTradeByUser[nftId][user].size();
         require( size > 0, "no nft minted" );
         return nftTradeByUser[nftId][user].getValueAtIndex(0);
+    }
+
+
+    function getAllAuthors()
+    public view returns (string[] memory)
+    {
+        return listOfAuthors.getAllValues();
+    }
+    function getAllRarity()
+    public view returns (string[] memory)
+    {
+        return listOfRarity.getAllValues();
     }
 
 }

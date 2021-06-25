@@ -115,8 +115,22 @@ describe('NftMinting', function () {
             expect(getNftByAuthorUser.nftInfoByAuthor[0].nftId).to.be.equal(_nftIdB);
             expect(getNftByAuthorUser.nftInfoByAuthor[0].rarity).to.be.equal('rarityB');
 
-            // console.log('getNftByAuthorDev.nftInfoByAuthor[0]', getNftByAuthorDev.nftInfoByAuthor[0]);
-            // console.log('getNftByAuthorDev.nftInfoStateByAuthor[0]', getNftByAuthorDev.nftInfoStateByAuthor[0]);
+            let getAllAuthors = await this.NftFarm.getAllAuthors({from: dev});
+            let getAllRarity = await this.NftFarm.getAllRarity({from: dev});
+
+            await this.NftFarm.set(_nftIdA, _author,
+                _startBlock, _endBlock, _allowMng,
+                "rarityC", _uri, _authorFee,
+                "dev1", "@dev1", {from: dev});
+
+            // console.log('getAllAuthors', getAllAuthors);
+            // console.log('getAllRarity', getAllRarity);
+
+            getAllAuthors = await this.NftFarm.getAllAuthors({from: dev});
+            getAllRarity = await this.NftFarm.getAllRarity({from: dev});
+
+            expect(getAllAuthors[2]).to.be.equal('dev1');
+            expect(getAllRarity[2]).to.be.equal('rarityC');
 
         });
 

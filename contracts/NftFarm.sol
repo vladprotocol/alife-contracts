@@ -5,8 +5,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "./NFT.sol";
-import "./libs/IBEP20.sol";
-import "./libs/SafeBEP20.sol";
+import "./IBEP20.sol";
+import "./SafeBEP20.sol";
 
 pragma solidity ^0.6.12;
 

@@ -5,7 +5,7 @@ const {expect} = require('chai');
 const Token = contract.fromArtifact('AfterLife');
 const NFT = contract.fromArtifact('NFT');
 const NftFarm = contract.fromArtifact('NftFarmV2');
-let dev, user;
+let dev, user, userx;
 const mintAmount = '1';
 const _name = 'Life';//
 const _symbol = 'ALIFE';
@@ -45,11 +45,13 @@ describe('NftMinting', function () {
         this.timeout(60000);
         dev = accounts[0];
         user = accounts[1];
+        userx = accounts[2];
         this.Token = await Token.new({from: dev});
 
         await this.Token.setMinterStatus(dev, true, {from: dev});
         await this.Token.mint(dev, supply, {from: dev});
         await this.Token.mint(user, supply, {from: dev});
+        await this.Token.mint(userx, supply, {from: dev});
 
 
         this.NFT = await NFT.new(baseURI, {from: dev});
@@ -134,7 +136,7 @@ describe('NftMinting', function () {
 
         });
 
-        /*
+
         it('nft ownership transfer', async function () {
             this.timeout(60000);
             const _nftIdA = '10', _nftIdB = '11', _author = user, _startBlock = 1,
@@ -200,10 +202,9 @@ describe('NftMinting', function () {
 
 
         });
-        */
+
     });
 
-    /*
     describe('NFT MINTING & BURN', function () {
 
         it('1) MINT A NFT', async function () {
@@ -225,9 +226,7 @@ describe('NftMinting', function () {
             expect(ownersOf[0]).to.be.equal(dev);
 
         });
-        */
 
-        /*
         it('1) MINT A NFT', async function () {
             this.timeout(60000);
             const _nftId = '1', _author = user, _startBlock = 1,
@@ -346,6 +345,7 @@ describe('NftMinting', function () {
 
             await this.Token.approve(this.NftFarm.address, supply, {from: dev});
             await this.Token.approve(this.NftFarm.address, supply, {from: user});
+            await this.Token.approve(this.NftFarm.address, supply, {from: userx});
             await this.NftFarm.mint(_nftId, {from: dev});
             await this.NftFarm.mint(_nftId, {from: dev});
             await this.NftFarm.mint(_nftId, {from: dev});
@@ -358,20 +358,35 @@ describe('NftMinting', function () {
             const tradeId1 = trades[1]; // 1
             const tradeId2 = trades[2]; // 2
             await this.NFT.setApprovalForAll(this.NftFarm.address, price, {from: dev});
-            await expectRevert(this.NftFarm.sell(tradeId0, halfPrice, {from: dev}), 'price bellow min price');
+            await expectRevert(this.NftFarm.sell(tradeId0, halfPrice, {from: dev}), 'price < min price');
 
+            // put to sell
             await this.NftFarm.sell(tradeId0, doublePrice, {from: dev});
+
+            // revert on double sell
+            await expectRevert( this.NftFarm.sell(tradeId0, doublePrice, {from: dev}),'not sellable');
+
+            // put to sell
             await this.NftFarm.sell(tradeId1, price, {from: dev});
+
+            // put to sell
             await this.NftFarm.sell(tradeId2, price, {from: dev});
 
             let getListOpenTradesByNftId = await this.NftFarm.getListOpenTradesByNftId(_nftId, {from: dev});
             // console.log('getListOpenTradesByNftId', getListOpenTradesByNftId);
 
+            // buy a item
             await this.NftFarm.buy(tradeId0, {from: user});
+
+            // revert on double buy
+            await expectRevert(this.NftFarm.buy(tradeId0, {from: userx}),'buy: not for sell');
+
+            // buy a item
             await this.NftFarm.buy(tradeId1, {from: user});
+
+            // buy a item
             await this.NftFarm.buy(tradeId2, {from: user});
 
-            await expectRevert(this.NftFarm.buy(tradeId0, {from: dev}),'buy: not for sell');
 
         });
 
@@ -775,5 +790,5 @@ describe('NftMinting', function () {
         });
 
     });
-    */
+
 });

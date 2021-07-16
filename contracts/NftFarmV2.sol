@@ -32,14 +32,14 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "./libs/INFT.sol";
-import "./libs/IBEP20.sol";
-import "./libs/SafeBEP20.sol";
+import "./INFT.sol";
+import "./IBEP20.sol";
+import "./SafeBEP20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import './libs/AddrArrayLib.sol';
-import './libs/Uint256ArrayLib.sol';
-import './libs/Uint8ArrayLib.sol';
-import './libs/StringArrayLib.sol';
+import "./AddrArrayLib.sol";
+import "./Uint256ArrayLib.sol";
+import "./Uint8ArrayLib.sol";
+import "./StringArrayLib.sol";
 
 pragma experimental ABIEncoderV2;
 pragma solidity ^0.6.12;
@@ -197,9 +197,10 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     event NftBurn(address indexed from, uint256 indexed tokenId);
     event NftTransfer(address indexed from, address indexed to, uint256 indexed tradeId);
 
-    constructor(INFT _nft, IBEP20 _token) public {
-        nft = _nft;
-        token = _token;
+    constructor(address _nft, address _token) public {
+        require( address(nft) == address(0), "!init");
+        nft = INFT(_nft);
+        token = IBEP20(_token);
         mintingManager[msg.sender] = true;
 
         // all fee wallets defaults to deployer, must be changed later.
@@ -223,32 +224,19 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         return ownersOf[_nftId].getAllAddresses().length;
     }
 
-
     function getMinted(address _user) external view returns
-    (uint8[] memory, uint256[] memory, address[] memory, uint256[] memory, uint256[] memory, uint256[] memory){
+    (uint8[] memory, uint256[] memory, uint256[] memory){
         uint256 total = minted.length;
         uint256[] memory mintedAmounts = new uint256[](total);
-        address[] memory lastOwner = new address[](total);
         uint256[] memory myMints = new uint256[](total);
 
         for (uint256 index = 0; index < total; ++index) {
             uint8 nftId = minted[index];
             NftInfoState storage NftState = nftInfoState[nftId];
-            lastOwner[index] = NftState.lastOwner;
             mintedAmounts[index] = NftState.minted;
             myMints[index] = getMintsOf(_user, nftId);
         }
-
-        uint256 nftTotal = nftIndex.length;
-        uint256[] memory maxMintByNft = new uint256[](nftTotal);
-        uint256[] memory prices = new uint256[](nftTotal);
-        for (uint8 nftId = 0; nftId < nftTotal; ++nftId) {
-            NftInfoState storage NFT = nftInfoState[nftId];
-            maxMintByNft[nftId] = NFT.maxMint;
-            prices[nftId] = getPrice(nftId, NFT.minted);
-        }
-
-        return (minted, mintedAmounts, lastOwner, maxMintByNft, prices, myMints);
+        return (minted, mintedAmounts, myMints);
     }
 
     // get total mints of a nft filtered by user
@@ -265,11 +253,8 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     }
 
     function getPrice(uint8 _nftId, uint256 _minted) public view returns (uint256){
-
         NftInfoState storage NFT = nftInfoState[_nftId];
-
         uint256 price = NFT.price;
-
         if (_minted == 0) {
             return price;
         }
@@ -278,7 +263,6 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
             for (uint256 i = 0; i < _minted; ++i) {
                 price = price.mul(NFT.multiplier).div(1000000);
             }
-            return price;
         }
         return price;
     }
@@ -299,10 +283,10 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
             NftState.nft.setNftName(_nftId, NFT.rarity);
         }
 
-        NftState.minted = NftState.minted.add(1);
         NftState.lastOwner = msg.sender;
         NftState.lastMint = block.timestamp;
-        NftState.price = getPrice(_nftId, NftState.minted);
+        NftState.price = getPrice(_nftId, 1);
+        NftState.minted = NftState.minted.add(1);
 
         require(NftState.maxMint == 0 || NftState.minted <= NftState.maxMint, "Max minting reached");
 
@@ -370,7 +354,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         require(TRADE.owner == msg.sender, "not nft owner");
         require(TRADE.burnedIn == 0, "already burned"); // avoid double burn exploit
         require(NftState.minted > 0, "no burn available");
-        require(NFT.status > 0, "nft disabled");
+        require(NFT.status > 0, "disabled");
 
         require(NftState.nft.ownerOf(TRADE.tokenId) == address(msg.sender), "not owner");
         NftState.nft.burn(TRADE.tokenId);
@@ -390,6 +374,8 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
             totalTokensRefunded = totalTokensRefunded.add(TRADE.reserve);
         }
         totalBurn = totalBurn.add(1);
+
+        listOfOpenSells[TRADE.nftId].removeValue(tradeId); // added only once
 
         emit NftBurn(msg.sender, tradeId);
     }
@@ -420,7 +406,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         NftInfoState storage NftState = nftInfoState[_nftId];
 
         require(_nftId != 0, "invalid nftId");
-        require(NFT.nftId == 0, "NFT already exists");
+        require(NFT.nftId == 0, "already exists");
 
         nftIndex.push(_nftId);
 
@@ -441,7 +427,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         NftState.token = token; // default platform payment token
 
         // avoid fee mint/burn exploit
-        require(platformFees.authorFee.add(platformFees.govFee).add(platformFees.devFee).add(_authorFee) < 10000, "FEE TOO HIGH");
+        require(platformFees.authorFee.add(platformFees.govFee).add(platformFees.devFee).add(_authorFee) < 10000, "TOO HIGH");
 
         uint8[] storage nftByRarity = listOfNftByRarity[_rarity];
         uint8[] storage nftByAuthors = listOfNftByAuthor[_authorName];
@@ -492,7 +478,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         NFT.endBlock = _endBlock;
 
         // avoid fee mint/burn exploit
-        require(platformFees.authorFee.add(platformFees.govFee).add(platformFees.devFee).add(_authorFee) < 10000, "FEE TOO HIGH");
+        require(platformFees.authorFee.add(platformFees.govFee).add(platformFees.devFee).add(_authorFee) < 10000, "TOO HIGH");
 
         emit NftChanged(_nftId, _author, _startBlock, _endBlock);
     }
@@ -504,7 +490,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     mintingManagers
     {
         NftInfoState storage NftState = nftInfoState[_nftId];
-        require(NftState.nftId != 0, "NFT does not exists");
+        require(NftState.nftId != 0, "does not exists");
         NftState.price = _price;
         NftState.maxMint = _maxMint;
         NftState.multiplier = _multiplier;
@@ -534,24 +520,18 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         platformFees.authorFee = govFee;
         platformFees.govFee = devFee;
         platformFees.devFee = authorFee;
-        require(authorFee.add(govFee).add(devFee).add(platformFees.authorFee) < 10000, "FEE TOO HIGH");
+        require(authorFee.add(govFee).add(devFee).add(platformFees.authorFee) < 10000, "TOO HIGH");
     }
 
     function adminSetMarketFee(uint256 govFee, uint256 devFee, uint256 authorFee) external onlyOwner {
         platformFees.marketAuthorFee = govFee;
         platformFees.marketGovFee = devFee;
         platformFees.marketDevFee = authorFee;
-        require(authorFee.add(govFee).add(devFee).add(platformFees.authorFee) < 10000, "FEE TOO HIGH");
-    }
-
-
-    modifier management(NftInfo storage NFT){
-        require(mintingManager[msg.sender] == true || (NFT.allowMng == true && NFT.author == msg.sender), "not owner|manager");
-        _;
+        require(authorFee.add(govFee).add(devFee).add(platformFees.authorFee) < 10000, "TOO HIGH");
     }
 
     modifier mintingManagers(){
-        require(mintingManager[_msgSender()] == true, "Managers: not a manager");
+        require(mintingManager[_msgSender()] == true, "not manager");
         _;
     }
 
@@ -638,6 +618,9 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
         nftTradeByUser[TRADE.nftId][msg.sender].removeValue(tradeId); // remove old owner
         nftTradeByUser[TRADE.nftId][to].pushValue(tradeId); // add new owner
 
+        // remove from sell list
+        listOfOpenSells[TRADE.nftId].removeValue(tradeId); // added only once
+
         emit NftTransfer(msg.sender, to, tradeId);
     }
 
@@ -648,7 +631,7 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     mintingManagers
     {
         NftSecondaryMarket storage NFT = nftSecondaryMarket[_nftId];
-        require(nftInfoState[_nftId].nftId > 0, "NFT does not exists");
+        require(nftInfoState[_nftId].nftId > 0, "does not exists");
         require(_sellMinPrice > 0, "invalid sell min price");
         NFT.allowSell = _allowSell;
         NFT.sellMinPrice = _sellMinPrice;
@@ -657,18 +640,19 @@ contract NftFarmV2 is Ownable, ReentrancyGuard {
     function sell(uint256 tradeId, uint256 _price)
     external nonReentrant
     {
-        require(tradeId > 0, "not minted");
+        require(tradeId > 0, "no minted");
 
         NftTradeInfo storage TRADE = nftTrade[tradeId];
         uint8 _nftId = TRADE.nftId;
         NftSecondaryMarket storage MARKET = nftSecondaryMarket[_nftId];
-        require(MARKET.allowSell == true, "NFT not sellable");
+        NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[tradeId];
+        require(MARKET.allowSell && secondaryTrade.sellPrice == 0, "not sellable");
 
         require(TRADE.owner == msg.sender, "not owner");
-        require(_price >= MARKET.sellMinPrice, "price bellow min price");
+        require(_price >= MARKET.sellMinPrice, "price < min price");
         listOfOpenSells[_nftId].pushValue(tradeId); // added only once
 
-        NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[tradeId];
+
         secondaryTrade.sellPrice = _price;
         secondaryTrade.sellDate = block.timestamp;
 

@@ -10,15 +10,15 @@ https://twitter.com/VladFinance
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./libs/IBEP20.sol";
-import "./libs/SafeBEP20.sol";
+import "./IBEP20.sol";
+import "./SafeBEP20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./AfterLife.sol";
 import "./NFT.sol";
 import "./NftFarm.sol";
-import "./libs/stringUtils.sol";
+import "./stringUtils.sol";
 
 // MasterChef is the master of Life. He can make Life and he is a fair guy.
 //

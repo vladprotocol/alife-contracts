@@ -9,7 +9,7 @@ https://twitter.com/VladFinance
 
 pragma solidity 0.6.12;
 
-import "./libs/BEP20.sol";
+import "./BEP20.sol";
 
 // AfterLife with Governance.
 contract AfterLife is BEP20('AfterLife', 'ALIFE') {

@@ -314,8 +314,7 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         ownersOf[_nftId].pushAddress(msg.sender, true);
 
         // we increment before, then we can check if index is != 0
-        tradeIdPool = tradeIdPool.add(1);
-        // we finished here, increment trade index by i
+        tradeIdPool = tradeIdPool.add(1); // we finished here, increment trade index by i
 
         uint256[] storage tradesByNftId = listOfTradesByNftId[_nftId];
         tradesByNftId.push(tradeIdPool);
@@ -449,10 +448,8 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         NFT.status = _status;
 
         NftState.nftId = _nftId;
-        NftState.nft = nft;
-        // default platform nft
-        NftState.token = token;
-        // default platform payment token
+        NftState.nft = nft; // default platform nft
+        NftState.token = token; // default platform payment token
 
         // avoid fee mint/burn exploit
         require(platformFees.authorFee.add(platformFees.govFee).add(platformFees.devFee).add(_authorFee) < 10000, "TOO HIGH");
@@ -641,24 +638,17 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         // security check: if user transfer his nft via other contract, this should fail.
         require(NftState.nft.ownerOf(TRADE.tokenId) == address(msg.sender), "not owner");
         NftState.nft.safeTransferFrom(msg.sender, to, TRADE.tokenId);
-        TRADE.owner = to;
-        // update trade owner to new owner
-        NftState.lastOwner = to;
-        // new owner
+        TRADE.owner = to; // update trade owner to new owner
+        NftState.lastOwner = to; // new owner
 
-        ownersOf[TRADE.nftId].removeAddress(msg.sender);
-        // remove old owner
-        ownersOf[TRADE.nftId].pushAddress(to, true);
-        // add new owner
+        ownersOf[TRADE.nftId].removeAddress(msg.sender); // remove old owner
+        ownersOf[TRADE.nftId].pushAddress(to, true); // add new owner
 
-        nftTradeByUser[TRADE.nftId][msg.sender].removeValue(tradeId);
-        // remove old owner
-        nftTradeByUser[TRADE.nftId][to].pushValue(tradeId);
-        // add new owner
+        nftTradeByUser[TRADE.nftId][msg.sender].removeValue(tradeId); // remove old owner
+        nftTradeByUser[TRADE.nftId][to].pushValue(tradeId); // add new owner
 
         // remove from sell list
-        listOfOpenSells[TRADE.nftId].removeValue(tradeId);
-        // added only once
+        listOfOpenSells[TRADE.nftId].removeValue(tradeId); // added only once
 
         emit NftTransfer(msg.sender, to, tradeId);
     }

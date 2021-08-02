@@ -227,19 +227,13 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         platformAddresses.govFeeAddr = msg.sender;
         platformAddresses.devFeeAddr = msg.sender;
 
-        platformFees.authorFee = 3000;
-        // 30%
-        platformFees.govFee = 1500;
-        // 15%
-        platformFees.devFee = 500;
-        //  5%
+        platformFees.authorFee = 3000; // 30%
+        platformFees.govFee = 1500; // 15%
+        platformFees.devFee = 500; //  5%
 
-        platformFees.marketAuthorFee = 3000;
-        // 30%
-        platformFees.marketGovFee = 1500;
-        // 15%
-        platformFees.marketDevFee = 500;
-        //  5%
+        platformFees.marketAuthorFee = 3000; // 30%
+        platformFees.marketGovFee = 1500; // 15%
+        platformFees.marketDevFee = 500; //  5%
 
     }
 

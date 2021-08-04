@@ -181,6 +181,8 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
 
     event NewNftAuctionMarket(uint8 indexed nftId, uint256 minBid, uint256 blockStart);
     event NewNftBid(uint8 indexed nftId, uint256 bid, address indexed user);
+    event AuctionWin(uint8 indexed nftId, uint256 bid, address indexed user);
+    event AuctionEnd(uint8 indexed nftId, address indexed user);
     struct NftAuctionMarket {
         uint8 nftId;
         bool allowAuction;
@@ -290,14 +292,17 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
 
 
     function mint(uint8 _nftId) external nonReentrant {
-
         NftInfo storage NFT = nftInfo[_nftId];
         NftInfoState storage NftState = nftInfoState[_nftId];
-
         require(NftState.nftId > 0, "NFT not available");
         require(NFT.status > 0, "nft disabled");
         require(NFT.startBlock == 0 || block.number > NFT.startBlock, "Too early");
         require(NFT.endBlock == 0 || block.number < NFT.endBlock, "Too late");
+        _mint(_nftId);
+    }
+    function _mint(uint8 _nftId) internal {
+        NftInfo storage NFT = nftInfo[_nftId];
+        NftInfoState storage NftState = nftInfoState[_nftId];
 
         if (NftState.minted == 0) {
             minted.push(_nftId);
@@ -859,7 +864,7 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
     mintingManagers
     {
         NftAuctionMarket storage AUCTION = nftAuctionMarket[_nftId];
-        require(nftInfoState[_nftId].nftId > 0, "nft does not exists");
+        require(nftInfoState[_nftId].nftId > 0, "nft not configured");
         require(_minBid > 0, "invalid sell min price");
         require(_blockStart > _blockEnd, "invalid start/end block");
         require(_blockStart > block.number, "invalid end block");
@@ -878,7 +883,7 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         AUCTION.state = 1;
         // open auction
         AUCTION.auctionLimit = _auctionLimit;
-        emit NewNftAuctionMarket(nftId, _minBid, _blockStart);
+        emit NewNftAuctionMarket(_nftId, _minBid, _blockStart);
     }
 
     function bid(uint8 _nftId, uint256 _bid) external nonReentrant {
@@ -913,33 +918,20 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
 
         AUCTION.lastBid = _bid;
         auctionBid[_nftId].pushValue(_bid); // save this bid into the bid list
-
-        if (block.number >= AUCTION.blockEnd) {
-            _auctionCommit(_nftId);
+        emit NewNftBid(_nftId, _bid, msg.sender);
+        if (block.number > AUCTION.blockEnd) {
+            if (AUCTION.auctionCount == AUCTION.auctionLimit) {
+                // auction completed
+                AUCTION.state = 2;
+                emit AuctionEnd(_nftId, msg.sender);
+            } else {
+                // we mint more
+                AUCTION.auctionCount = AUCTION.auctionCount.add(1);
+                _mint(_nftId);
+                emit AuctionWin(_nftId, _bid, msg.sender);
+            }
         }
-        emit NewNftBid(_nftId, _bid, _bid, msg.sender);
+
     }
 
-    function _auctionCommit(uint8 _nftId) internal {
-        NftAuctionMarket storage AUCTION = nftAuctionMarket[_nftId];
-        NftInfoState storage NftState = nftInfoState[_nftId];
-
-        uint256 artistFee = AUCTION.lastBid.mul(platformFees.authorFee).div(10000);
-        uint256 governanceFee = AUCTION.lastBid.mul(platformFees.govFee).div(10000);
-        uint256 devFee = AUCTION.lastBid.mul(platformFees.devFee).div(10000);
-        uint256 reserve = AUCTION.lastBid.sub(artistFee).sub(governanceFee).sub(devFee);
-
-        NftState.token.safeTransferFrom(address(msg.sender), nftInfo[_nftId].author, artistFee);
-        NftState.token.safeTransferFrom(address(msg.sender), platformAddresses.govFeeAddr, governanceFee);
-        NftState.token.safeTransferFrom(address(msg.sender), platformAddresses.devFeeAddr, devFee);
-        NftState.token.safeTransferFrom(address(msg.sender), address(this), reserve);
-
-        if (AUCTION.auctionCount == AUCTION.auctionLimit) {
-            // auction completed
-            AUCTION.state = 2;
-        } else {
-            // we mint more
-            AUCTION.auctionCount = AUCTION.auctionCount.add(1);
-        }
-    }
 }

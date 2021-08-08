@@ -9,8 +9,8 @@
     "testnet": "truffle migrate --network testnet --f 2 --to 2 && truffle run verify AfterLife MasterChefV2 --network testnet",
     "testnet-vlad": "truffle migrate --f 3 --to 3 --network testnet --reset && truffle run verify VladToken --network testnet",
     "mainnet": "truffle migrate --network mainnet --reset && truffle run verify AfterLife MasterChefV2 --network mainnet",
-    "test": "truffle test test/NftPriceCurve.test.js --network dev --bail",
-    "live": "truffle migrate --network dev --f 3 --to 3 && nodemon --exec yarn test -e sol,js"
+    "test": "truffle test test/auction.js --network dev --bail",
+    "live": "truffle migrate --network dev --f 5 --to 5 && nodemon --exec yarn test -e sol,js"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^3.2.0",
@@ -21,6 +21,7 @@
     "dotenv": "^8.2.0",
     "ethereum-waffle": "^3.0.0",
     "ethers": "^5.0.14",
+    "nodemon": "^2.0.12",
     "solidity-coverage": "^0.7.13",
     "truffle": "^5.1.58",
     "truffle-flattener": "^1.5.0",

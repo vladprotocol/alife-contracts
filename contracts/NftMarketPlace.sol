@@ -183,6 +183,7 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
     event NewNftBid(uint8 indexed nftId, uint256 bid, address indexed user);
     event AuctionWin(uint8 indexed nftId, uint256 bid, address indexed user);
     event AuctionEnd(uint8 indexed nftId, address indexed user);
+
     struct NftAuctionMarket {
         uint8 nftId;
         bool allowAuction;
@@ -190,6 +191,7 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         uint256 blockStart;
         uint256 blockEnd;
         uint256 priceStep; // % min price increment on each bid, ex: 10=0.1%, 100=1%
+        uint256 entryFee; // a fee to join the auction (one time only)
         uint256 bidFee; // $ fee to be paid on each bid (to prevent spam), ex: 10=0.1%, 100=1%
         uint256 lastBid;
         uint256 bidFeeCollected;
@@ -220,7 +222,7 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
     event NftTransfer(address indexed from, address indexed to, uint256 indexed tradeId);
 
     constructor(address _nft, address _token) public {
-        require(address(nft) == address(0), "!init");
+
         nft = INFT(_nft);
         token = IBEP20(_token);
         mintingManager[msg.sender] = true;
@@ -229,13 +231,19 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         platformAddresses.govFeeAddr = msg.sender;
         platformAddresses.devFeeAddr = msg.sender;
 
-        platformFees.authorFee = 3000; // 30%
-        platformFees.govFee = 1500; // 15%
-        platformFees.devFee = 500; //  5%
+        platformFees.authorFee = 3000;
+        // 30%
+        platformFees.govFee = 1500;
+        // 15%
+        platformFees.devFee = 500;
+        //  5%
 
-        platformFees.marketAuthorFee = 3000; // 30%
-        platformFees.marketGovFee = 1500; // 15%
-        platformFees.marketDevFee = 500; //  5%
+        platformFees.marketAuthorFee = 3000;
+        // 30%
+        platformFees.marketGovFee = 1500;
+        // 15%
+        platformFees.marketDevFee = 500;
+        //  5%
 
     }
 
@@ -300,6 +308,7 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         require(NFT.endBlock == 0 || block.number < NFT.endBlock, "Too late");
         _mint(_nftId);
     }
+
     function _mint(uint8 _nftId) internal {
         NftInfo storage NFT = nftInfo[_nftId];
         NftInfoState storage NftState = nftInfoState[_nftId];
@@ -319,7 +328,8 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         ownersOf[_nftId].pushAddress(msg.sender, true);
 
         // we increment before, then we can check if index is != 0
-        tradeIdPool = tradeIdPool.add(1); // we finished here, increment trade index by i
+        tradeIdPool = tradeIdPool.add(1);
+        // we finished here, increment trade index by i
 
         uint256[] storage tradesByNftId = listOfTradesByNftId[_nftId];
         tradesByNftId.push(tradeIdPool);
@@ -453,8 +463,10 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         NFT.status = _status;
 
         NftState.nftId = _nftId;
-        NftState.nft = nft; // default platform nft
-        NftState.token = token; // default platform payment token
+        NftState.nft = nft;
+        // default platform nft
+        NftState.token = token;
+        // default platform payment token
 
         // avoid fee mint/burn exploit
         require(platformFees.authorFee.add(platformFees.govFee).add(platformFees.devFee).add(_authorFee) < 10000, "TOO HIGH");
@@ -600,6 +612,7 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         return (info, state);
     }
 
+
     function getNftByRarity(string memory rarity) public view returns
     (NftInfo[] memory nftInfoByRarity, NftInfoState[] memory nftInfoStateByRarity)
     {
@@ -643,167 +656,174 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         // security check: if user transfer his nft via other contract, this should fail.
         require(NftState.nft.ownerOf(TRADE.tokenId) == address(msg.sender), "not owner");
         NftState.nft.safeTransferFrom(msg.sender, to, TRADE.tokenId);
-        TRADE.owner = to; // update trade owner to new owner
-        NftState.lastOwner = to; // new owner
-
-        ownersOf[TRADE.nftId].removeAddress(msg.sender); // remove old owner
-        ownersOf[TRADE.nftId].pushAddress(to, true); // add new owner
-
-        nftTradeByUser[TRADE.nftId][msg.sender].removeValue(tradeId); // remove old owner
-        nftTradeByUser[TRADE.nftId][to].pushValue(tradeId); // add new owner
-
-        // remove from sell list
-        listOfOpenSells[TRADE.nftId].removeValue(tradeId); // added only once
-
-        emit NftTransfer(msg.sender, to, tradeId);
-    }
-
-    // nft secondary market sub-system:
-    function setNftSellable(uint8 _nftId, bool _allowSell,
-        uint256 _sellMinPrice)
-    external
-    mintingManagers
-    {
-        NftSecondaryMarket storage NFT = nftSecondaryMarket[_nftId];
-        require(nftInfoState[_nftId].nftId > 0, "does not exists");
-        require(_sellMinPrice > 0, "invalid sell min price");
-        NFT.allowSell = _allowSell;
-        NFT.sellMinPrice = _sellMinPrice;
-    }
-
-    function sell(uint256 tradeId, uint256 _price)
-    external nonReentrant
-    {
-        require(tradeId > 0, "no minted");
-
-        NftTradeInfo storage TRADE = nftTrade[tradeId];
-        uint8 _nftId = TRADE.nftId;
-        NftSecondaryMarket storage MARKET = nftSecondaryMarket[_nftId];
-        NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[tradeId];
-        require(MARKET.allowSell && secondaryTrade.sellPrice == 0, "not sellable");
-
-        require(TRADE.owner == msg.sender, "not owner");
-        require(_price >= MARKET.sellMinPrice, "price < min price");
-        listOfOpenSells[_nftId].pushValue(tradeId);
-        // added only once
-
-
-        secondaryTrade.sellPrice = _price;
-        secondaryTrade.sellDate = block.timestamp;
-
-    }
-
-    // list all trade id from a specific nft open to sell
-    function getListOpenTradesByNftId(uint8 _nftId)
-    public view returns (uint256[] memory sells)
-    {
-        return listOfOpenSells[_nftId].getAllValues();
-    }
-
-    // list all trades structs from a specific nft open to sell
-    function getOpenTradesByNftId(uint8 _nftId)
-    public view returns (NftTradeInfo[] memory TRADES)
-    {
-        uint256 size = listOfOpenSells[_nftId].size();
-        NftTradeInfo[] memory listOfTrades = new NftTradeInfo[](size);
-        for (uint256 i = 0; i < size; i++) {
-            uint256 tradeId = listOfOpenSells[_nftId].getValueAtIndex(i);
-            listOfTrades[i] = nftTrade[tradeId];
-        }
-        return listOfTrades;
-    }
-
-    function buy(uint8 tradeId)
-    external nonReentrant
-    {
-        require(tradeId > 0, "buy: NFT not minted");
-        NftTradeInfo storage TRADE = nftTrade[tradeId];
-        NftSecondaryMarket storage MARKET = nftSecondaryMarket[TRADE.nftId];
-        NftInfoState storage NftState = nftInfoState[TRADE.nftId];
-        // NftInfo storage NFT = nftInfo[TRADE.nftId];
-
-        NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[tradeId];
-        require(MARKET.allowSell == true, "buy: NFT not sellable");
-        require(TRADE.owner != msg.sender, "buy: no wash trading");
-        require(TRADE.burnedIn == 0, "buy: burned");
-        require(secondaryTrade.sellPrice > 0, "buy: not for sell");
-
-        buyDoPayment(tradeId);
-        // transfer from old owner to hew owner
-
-        require(NftState.nft.ownerOf(TRADE.tokenId) == TRADE.owner, "by: not owner anymore");
-        NftState.nft.safeTransferFrom(TRADE.owner, msg.sender, TRADE.tokenId);
-
-
-        ownersOf[TRADE.nftId].removeAddress(TRADE.owner);
-        // remove old owner
-        ownersOf[TRADE.nftId].pushAddress(msg.sender, true);
-        // add new owner
-
-        nftTradeByUser[TRADE.nftId][TRADE.owner].removeValue(tradeId);
-        // remove old owner
-        nftTradeByUser[TRADE.nftId][msg.sender].pushValue(tradeId);
-        // add new owner
-
-        emit NftTransfer(TRADE.owner, msg.sender, tradeId);
-
-        MARKET.qtdSells = MARKET.qtdSells.add(1);
-        MARKET.lastSellPrice = secondaryTrade.sellPrice;
-        MARKET.lastSellIn = block.timestamp;
-
-        TRADE.owner = msg.sender;
+        TRADE.owner = to;
         // update trade owner to new owner
-        NftState.lastOwner = msg.sender;
+        NftState.lastOwner = to;
         // new owner
 
-    }
+        ownersOf[TRADE.nftId].removeAddress(msg.sender);
+        // remove old owner
+        ownersOf[TRADE.nftId].pushAddress(to, true);
+        // add new owner
 
+        nftTradeByUser[TRADE.nftId][msg.sender].removeValue(tradeId);
+        // remove old owner
+        nftTradeByUser[TRADE.nftId][to].pushValue(tradeId);
+        // add new owner
 
-    function buyDoPayment(uint8 tradeId) internal {
-        NftTradeInfo storage TRADE = nftTrade[tradeId];
-        NftInfo storage NFT = nftInfo[TRADE.nftId];
-        NftInfoState storage STATE = nftInfoState[TRADE.nftId];
-        NftSecondaryMarket storage secondaryMarketInfo = nftSecondaryMarket[tradeId];
-        NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[tradeId];
-
-
-        // transfer tokens from new owner to old owner
-        uint256 _authorFee = NFT.authorFee;
-        if (_authorFee == 0) {
-            _authorFee = platformFees.authorFee;
-            // default author fee
-        }
-
-        uint256 _artistFee = secondaryTrade.sellPrice.mul(_authorFee).div(10000);
-        uint256 _governanceFee = secondaryTrade.sellPrice.mul(platformFees.govFee).div(10000);
-        uint256 _devFee = secondaryTrade.sellPrice.mul(platformFees.devFee).div(10000);
-        uint256 _totalSold = secondaryTrade.sellPrice.sub(_artistFee).sub(_governanceFee).sub(_devFee);
-
-        // do platform transfers
-        STATE.token.safeTransferFrom(address(msg.sender), NFT.author, _artistFee);
-        STATE.token.safeTransferFrom(address(msg.sender), platformAddresses.govFeeAddr, _governanceFee);
-        STATE.token.safeTransferFrom(address(msg.sender), platformAddresses.devFeeAddr, _devFee);
-
-        // after fees, pay old owner:
-        STATE.token.safeTransferFrom(address(msg.sender), TRADE.owner, _totalSold);
-
-        // accumulate fees paid
-        secondaryMarketInfo.totalArtistFee = secondaryMarketInfo.totalArtistFee.add(_artistFee);
-        secondaryMarketInfo.totalGovernanceFee = secondaryMarketInfo.totalGovernanceFee.add(_governanceFee);
-        secondaryMarketInfo.totalDevFee = secondaryMarketInfo.totalDevFee.add(_devFee);
-        secondaryMarketInfo.totalCollected = secondaryMarketInfo.totalCollected.add(_totalSold);
-
-        secondaryTrade.sellPrice = 0;
-        // reset selling property
-        secondaryTrade.soldDate = block.timestamp;
-        //when sold
-
-        // remove this trade from the list of open trades
+        // remove from sell list
         listOfOpenSells[TRADE.nftId].removeValue(tradeId);
         // added only once
 
+        emit NftTransfer(msg.sender, to, tradeId);
     }
+    /**
+        // nft secondary market sub-system:
+        function setNftSellable(uint8 _nftId, bool _allowSell,
+            uint256 _sellMinPrice)
+        external
+        mintingManagers
+        {
+            NftSecondaryMarket storage NFT = nftSecondaryMarket[_nftId];
+            require(nftInfoState[_nftId].nftId > 0, "does not exists");
+            require(_sellMinPrice > 0, "invalid sell min price");
+            NFT.allowSell = _allowSell;
+            NFT.sellMinPrice = _sellMinPrice;
+        }
 
+        function sell(uint256 tradeId, uint256 _price)
+        external nonReentrant
+        {
+            require(tradeId > 0, "no minted");
+
+            NftTradeInfo storage TRADE = nftTrade[tradeId];
+            uint8 _nftId = TRADE.nftId;
+            NftSecondaryMarket storage MARKET = nftSecondaryMarket[_nftId];
+            NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[tradeId];
+            require(MARKET.allowSell && secondaryTrade.sellPrice == 0, "not sellable");
+
+            require(TRADE.owner == msg.sender, "not owner");
+            require(_price >= MARKET.sellMinPrice, "price < min price");
+            listOfOpenSells[_nftId].pushValue(tradeId);
+            // added only once
+
+
+            secondaryTrade.sellPrice = _price;
+            secondaryTrade.sellDate = block.timestamp;
+
+        }
+
+        // list all trade id from a specific nft open to sell
+        function getListOpenTradesByNftId(uint8 _nftId)
+        public view returns (uint256[] memory sells)
+        {
+            return listOfOpenSells[_nftId].getAllValues();
+        }
+
+        // list all trades structs from a specific nft open to sell
+        function getOpenTradesByNftId(uint8 _nftId)
+        public view returns (NftTradeInfo[] memory TRADES)
+        {
+            uint256 size = listOfOpenSells[_nftId].size();
+            NftTradeInfo[] memory listOfTrades = new NftTradeInfo[](size);
+            for (uint256 i = 0; i < size; i++) {
+                uint256 tradeId = listOfOpenSells[_nftId].getValueAtIndex(i);
+                listOfTrades[i] = nftTrade[tradeId];
+            }
+            return listOfTrades;
+        }
+
+        function buy(uint8 tradeId)
+        external nonReentrant
+        {
+            require(tradeId > 0, "buy: NFT not minted");
+            NftTradeInfo storage TRADE = nftTrade[tradeId];
+            NftSecondaryMarket storage MARKET = nftSecondaryMarket[TRADE.nftId];
+            NftInfoState storage NftState = nftInfoState[TRADE.nftId];
+            // NftInfo storage NFT = nftInfo[TRADE.nftId];
+
+            NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[tradeId];
+            require(MARKET.allowSell == true, "buy: NFT not sellable");
+            require(TRADE.owner != msg.sender, "buy: no wash trading");
+            require(TRADE.burnedIn == 0, "buy: burned");
+            require(secondaryTrade.sellPrice > 0, "buy: not for sell");
+
+            buyDoPayment(tradeId);
+            // transfer from old owner to hew owner
+
+            require(NftState.nft.ownerOf(TRADE.tokenId) == TRADE.owner, "by: not owner anymore");
+            NftState.nft.safeTransferFrom(TRADE.owner, msg.sender, TRADE.tokenId);
+
+
+            ownersOf[TRADE.nftId].removeAddress(TRADE.owner);
+            // remove old owner
+            ownersOf[TRADE.nftId].pushAddress(msg.sender, true);
+            // add new owner
+
+            nftTradeByUser[TRADE.nftId][TRADE.owner].removeValue(tradeId);
+            // remove old owner
+            nftTradeByUser[TRADE.nftId][msg.sender].pushValue(tradeId);
+            // add new owner
+
+            emit NftTransfer(TRADE.owner, msg.sender, tradeId);
+
+            MARKET.qtdSells = MARKET.qtdSells.add(1);
+            MARKET.lastSellPrice = secondaryTrade.sellPrice;
+            MARKET.lastSellIn = block.timestamp;
+
+            TRADE.owner = msg.sender;
+            // update trade owner to new owner
+            NftState.lastOwner = msg.sender;
+            // new owner
+
+        }
+
+
+        function buyDoPayment(uint8 tradeId) internal {
+            NftTradeInfo storage TRADE = nftTrade[tradeId];
+            NftInfo storage NFT = nftInfo[TRADE.nftId];
+            NftInfoState storage STATE = nftInfoState[TRADE.nftId];
+            NftSecondaryMarket storage secondaryMarketInfo = nftSecondaryMarket[tradeId];
+            NftSecondaryTradeInfo storage secondaryTrade = nftSecondaryTradeInfo[tradeId];
+
+
+            // transfer tokens from new owner to old owner
+            uint256 _authorFee = NFT.authorFee;
+            if (_authorFee == 0) {
+                _authorFee = platformFees.authorFee;
+                // default author fee
+            }
+
+            uint256 _artistFee = secondaryTrade.sellPrice.mul(_authorFee).div(10000);
+            uint256 _governanceFee = secondaryTrade.sellPrice.mul(platformFees.govFee).div(10000);
+            uint256 _devFee = secondaryTrade.sellPrice.mul(platformFees.devFee).div(10000);
+            uint256 _totalSold = secondaryTrade.sellPrice.sub(_artistFee).sub(_governanceFee).sub(_devFee);
+
+            // do platform transfers
+            STATE.token.safeTransferFrom(address(msg.sender), NFT.author, _artistFee);
+            STATE.token.safeTransferFrom(address(msg.sender), platformAddresses.govFeeAddr, _governanceFee);
+            STATE.token.safeTransferFrom(address(msg.sender), platformAddresses.devFeeAddr, _devFee);
+
+            // after fees, pay old owner:
+            STATE.token.safeTransferFrom(address(msg.sender), TRADE.owner, _totalSold);
+
+            // accumulate fees paid
+            secondaryMarketInfo.totalArtistFee = secondaryMarketInfo.totalArtistFee.add(_artistFee);
+            secondaryMarketInfo.totalGovernanceFee = secondaryMarketInfo.totalGovernanceFee.add(_governanceFee);
+            secondaryMarketInfo.totalDevFee = secondaryMarketInfo.totalDevFee.add(_devFee);
+            secondaryMarketInfo.totalCollected = secondaryMarketInfo.totalCollected.add(_totalSold);
+
+            secondaryTrade.sellPrice = 0;
+            // reset selling property
+            secondaryTrade.soldDate = block.timestamp;
+            //when sold
+
+            // remove this trade from the list of open trades
+            listOfOpenSells[TRADE.nftId].removeValue(tradeId);
+            // added only once
+
+        }
+    */
 
 
     //auxiliary market views
@@ -866,72 +886,103 @@ contract NftMarketplace is Ownable, ReentrancyGuard {
         NftAuctionMarket storage AUCTION = nftAuctionMarket[_nftId];
         require(nftInfoState[_nftId].nftId > 0, "nft not configured");
         require(_minBid > 0, "invalid sell min price");
-        require(_blockStart > _blockEnd, "invalid start/end block");
-        require(_blockStart > block.number, "invalid end block");
+        require(_blockEnd > _blockStart, "invalid start/end block");
+        // require(_blockStart >= block.number, "invalid start block");
         require(_auctionLimit >= AUCTION.auctionCount, "invalid limit");
 
         // to prevent spam in the bid array list that can slowdown the app
         // min step is 0.01%
-        require(_priceStep>=1, "price step should be >= 1");
+        require(_priceStep >= 1, "price step should be >= 1");
 
         require(AUCTION.state != 1, "invalid state");
+        nftAuctionMarket[_nftId].nftId = _nftId;
         AUCTION.allowAuction = _allowAuction;
         AUCTION.minBid = _minBid;
         AUCTION.blockStart = _blockStart;
         AUCTION.blockEnd = _blockEnd;
         AUCTION.priceStep = _priceStep;
+        AUCTION.entryFee = _entryFee;
         AUCTION.state = 1;
         // open auction
         AUCTION.auctionLimit = _auctionLimit;
+        if( AUCTION.auctionCount == 0 ){
+            AUCTION.auctionCount = 1;
+        }
         emit NewNftAuctionMarket(_nftId, _minBid, _blockStart);
     }
 
     function bid(uint8 _nftId, uint256 _bid) external nonReentrant {
+
         NftAuctionMarket storage AUCTION = nftAuctionMarket[_nftId];
         NftInfoState storage NftState = nftInfoState[_nftId];
         require(AUCTION.nftId > 0, "nft does not exists");
         require(block.number >= AUCTION.blockStart, "auction not started");
-        require(block.number <= AUCTION.blockEnd, "auction not started");
-        require(AUCTION.auctionCount <= AUCTION.auctionLimit, "max limit reached");
+        require(AUCTION.auctionLimit > 0 && AUCTION.auctionCount <= AUCTION.auctionLimit, "max limit reached");
         require(AUCTION.state == 1, "invalid state");
 
         // initial bid should be >= min bid
         uint256 lastBid = AUCTION.lastBid > 0 ? AUCTION.lastBid : AUCTION.minBid;
         require(_bid > lastBid, "invalid bid");
 
-        // check bid increment to avoid spam
-        if (AUCTION.priceStep > 0) {
-            uint256 increment = _bid.mul(AUCTION.priceStep).div(10000);
-            require(lastBid >= _bid.add(increment));
-        }
+        (uint256 nextPrice, bool offeredIsValid, uint256 increment) = auctionNextPrice(_nftId, _bid);
+        require(offeredIsValid, "bid too low");
 
         // # bid fee to prevent spam
         // check first if we have a bid fee, deduct it here:
         if (AUCTION.bidFee > 0) {
-            uint256 fee = _bid.mul(AUCTION.bidFee).div(10000); // extract bid fee, ex: 10=0.1%, 100=1%
-            _bid = _bid.sub(fee);  // set the final bid price less fee:
-            uint256 artistFee = fee.mul(platformFees.authorFee).div(10000); // extract author fee
-            NftState.token.safeTransferFrom(address(msg.sender), nftInfo[_nftId].author, artistFee); // pay author
+            uint256 fee = _bid.mul(AUCTION.bidFee).div(10000);
+            // extract bid fee, ex: 10=0.1%, 100=1%
+            _bid = _bid.sub(fee);
+            // set the final bid price less fee:
+            uint256 artistFee = fee.mul(platformFees.authorFee).div(10000);
+            // extract author fee
+            NftState.token.safeTransferFrom(address(msg.sender), nftInfo[_nftId].author, artistFee);
+            // pay author
             // pay platform - less author
             NftState.token.safeTransferFrom(address(msg.sender), platformAddresses.govFeeAddr, fee.sub(artistFee));
         }
 
         AUCTION.lastBid = _bid;
-        auctionBid[_nftId].pushValue(_bid); // save this bid into the bid list
+        auctionBid[_nftId].pushValue(_bid);
+        // save this bid into the bid list
         emit NewNftBid(_nftId, _bid, msg.sender);
-        if (block.number > AUCTION.blockEnd) {
-            if (AUCTION.auctionCount == AUCTION.auctionLimit) {
-                // auction completed
+        if (block.number >= AUCTION.blockEnd) {
+            if (AUCTION.auctionLimit == 0 ||
+                AUCTION.auctionLimit > 0 && AUCTION.auctionCount == AUCTION.auctionLimit) {
                 AUCTION.state = 2;
                 emit AuctionEnd(_nftId, msg.sender);
-            } else {
-                // we mint more
-                AUCTION.auctionCount = AUCTION.auctionCount.add(1);
-                _mint(_nftId);
-                emit AuctionWin(_nftId, _bid, msg.sender);
             }
+            _mint(_nftId);
+            emit AuctionWin(_nftId, _bid, msg.sender);
+            AUCTION.auctionCount = AUCTION.auctionCount.add(1);
         }
+    }
 
+    // see the list of bids
+    function bidsByNftId( uint8 _nftId )
+    public view returns(uint256[] memory){
+        return auctionBid[_nftId].getAllValues();
+    }
+
+    // use to know the next best offer before you submit a bid
+    // and tx fail
+    function auctionNextPrice(uint8 _nftId, uint256 _bid) public view
+    returns(uint256 nextPrice, bool offeredIsValid, uint256 increment)
+    {
+        NftAuctionMarket storage AUCTION = nftAuctionMarket[_nftId];
+        if( AUCTION.priceStep == 0 ){
+            return (_bid, true, 0);
+        }
+        uint256 lastBid = AUCTION.lastBid > 0 ? AUCTION.lastBid : AUCTION.minBid;
+        increment = lastBid.mul(AUCTION.priceStep).div(10000);
+        nextPrice = lastBid.add(increment);
+        offeredIsValid = _bid >= nextPrice;
+        return (nextPrice, offeredIsValid, increment);
+    }
+
+    function getBlock()
+    public view returns(uint256){
+        return block.number;
     }
 
 }

@@ -54,10 +54,15 @@ contract NftLiteMarketPlace is Ownable, ReentrancyGuard {
     using StringArrayLib for StringArrayLib.Values;
 
     struct NftInfo {
+        string authorName;
+        string authorTwitter;
         uint256 floorPrice;
         uint256 fee;
         INFTLite nft;
         IBEP20 token;
+        uint256 orderCount; // number of total sell orders
+        uint256 soldCount; // number of already sold orders
+        // to get open sells: orderCount-soldCount
     }
 
     struct NftSell {
@@ -65,16 +70,75 @@ contract NftLiteMarketPlace is Ownable, ReentrancyGuard {
         uint256 tokenId;
         address user;
         uint256 price;
+        uint256 addedTime;
+        uint256 soldTime;
     }
 
     address[] public nftIndex;
     mapping(address => NftInfo) public nftInfo;
-    mapping(address => Uint256ArrayLib.Values) private ordersByNft;
+
+    // hold open sell orders indexed by nft contract
+    mapping(address => Uint256ArrayLib.Values) private openOrdersByNft;
+
+    // hold closed/sold sell orders indexed by nft contract
+    mapping(address => Uint256ArrayLib.Values) private closedOrdersByNft;
+
+    // list of all sells added by user address
+    mapping(address => Uint256ArrayLib.Values) private sellOrdersByUser;
+
+    // list of all buy orders made by user address
+    mapping(address => Uint256ArrayLib.Values) private buyOrdersByUser;
+
     mapping(address => Uint256ArrayLib.Values) private tokenIdToSell;
     mapping(uint256 => NftSell) private sellsByOrderId;
     uint256 orderIndex;
     address feeAddress;
     uint256 platformFee;
+
+    // fetch a list of nft contracts available in the platform, then
+    // use getNftMarketInfo to query info about each contract
+    function getAllNftContracts()
+    public view returns (uint256[] memory)
+    {
+        return nftIndex;
+    }
+
+    function getOpenOrdersByNFT(address nft)
+    public view returns (uint256[] memory)
+    {
+        return openOrdersByNft[nft].getAllValues();
+    }
+
+    function getClosedOrdersByNFT(address nft)
+    public view returns (uint256[] memory)
+    {
+        return closedOrdersByNft[nft].getAllValues();
+    }
+
+    function getSellsOrderIdByUser(address user)
+    public view returns (uint256[] memory)
+    {
+        return sellOrdersByUser[user].getAllValues();
+    }
+
+    function getBuyOrderIdByUser(address user)
+    public view returns (uint256[] memory)
+    {
+        return buyOrdersByUser[user].getAllValues();
+    }
+
+    function getOrderByOrderId(uint256 orderId)
+    public view returns (NftSell memory)
+    {
+        return NftSell[orderId];
+    }
+
+    function getNftMarketInfo(address nft)
+    public view returns (NftInfo memory)
+    {
+        return nftInfo[nft];
+    }
+
     constructor() public {
         feeAddress = msg.sender;
         platformFee = 1000; // 10%
@@ -88,30 +152,42 @@ contract NftLiteMarketPlace is Ownable, ReentrancyGuard {
 
     function sell(address _nft, uint256 _tokenId, uint256 _price) public {
         NftInfo storage NFT = nftInfo[_nft];
+        NFT.orderCount = NFT.orderCount.add(1);
+
         INFTLite nft = NFT.nft;
         require(msg.sender == nft.ownerOf(_tokenId), "not owner");
         require(_price >= NFT.floorPrice, "price too low");
-        ordersByNft[_nft].pushValue(orderIndex);
+        openOrdersByNft[_nft].pushValue(orderIndex);
         tokenIdToSell[_nft].pushValue(_tokenId);
+        sellOrdersByUser[msg.sender].pushValue(orderIndex);
         NftSell sell = sellsByOrderId[orderIndex];
         sell.orderId = orderIndex;
         sell.tokenId = _tokenId;
         sell.user = msg.sender;
         sell.price = _price;
+        sell.addedTime = msg.timestamp;
         orderIndex = orderIndex.add(1);
         // require(nft.isApprovedForAll(msg.sender, address(this)),"not approved to sell");
     }
-    function buy(address _nft, uint256 _tokenId, uint256 _orderId) public{
+    function buy(address _nft, uint256 _tokenId, uint256 _orderId) public nonReentrant{
         NftInfo storage NFT = nftInfo[_nft];
+        NFT.soldCount = NFT.soldCount.add(1);
+
         INFTLite nft = NFT.nft;
         IBEP20 token = NFT.token;
         NftSell sell = sellsByOrderId[_orderId];
+        sell.soldTime = msg.timestamp;
         uint256 fee = sell.price.mul(platformFee).div(10000);
         uint256 amount = price.sub(fee);
         token.safeTransferFrom(address(msg.sender), feeAddress, fee);
         token.safeTransferFrom(address(msg.sender), sell.user, amount);
         nft.safeTransferFrom(sell.user, address(msg.sender), _tokenId);
+
+        openOrdersByNft[_nft].removeValue(_orderId);
+        closedOrdersByNft[_nft].pushValue(_orderId);
+        buyOrdersByUser[msg.sender].pushValue(_orderId);
     }
+
     function isApproved( address user, address nft ) public view returns(bool){
         INFTLite nft = NFT.nft;
         return nft.isApprovedForAll(user, nft);
@@ -123,6 +199,7 @@ contract NftLiteMarketPlace is Ownable, ReentrancyGuard {
     mintingManagers
     {
         NftInfo storage NFT = nftInfo[_nft];
+
         nftIndex.push(_nft);
         NFT.nft = INFTLite(_nft);
         NFT.token = IBEP20(_token);
@@ -150,7 +227,10 @@ contract NftLiteMarketPlace is Ownable, ReentrancyGuard {
         require(mintingManager[_msgSender()] == true, "not manager");
         _;
     }
-    function _transfer(address nft, address to, uint256 tokenId) internal {
+
+    // do a simple nft transfer from one user to another, you need to approve this
+    // contract first.
+    function simpleTransfer(address nft, address to, uint256 tokenId) public nonReentrant {
         NftInfo storage NFT = nftInfo[nft];
         NFT.nft.safeTransferFrom(msg.sender, to, tokenId);
     }
